@@ -555,6 +555,11 @@ RangeFinder::RangeFinder(AP_SerialManager &_serial_manager, enum Rotation orient
     estimated_terrain_height(0),
     serial_manager(_serial_manager)
 {
+    // added by peter
+    if (ISDOVERBOSEINITPRINTOUTS) {
+        printf("called RangeFinder::RangeFinder(...)\n");
+    }
+
     AP_Param::setup_object_defaults(this, var_info);
 
     // set orientation defaults
@@ -577,6 +582,11 @@ RangeFinder::RangeFinder(AP_SerialManager &_serial_manager, enum Rotation orient
  */
 void RangeFinder::init(void)
 {
+    // added by peter
+    if (ISDOVERBOSEINITPRINTOUTS) {
+        printf("called RangeFinder::init()\n");
+    }
+
     if (num_instances != 0) {
         // init called a 2nd time?
         return;
@@ -921,3 +931,423 @@ MAV_DISTANCE_SENSOR RangeFinder::get_mav_distance_sensor_type_orient(enum Rotati
 }
 
 RangeFinder *RangeFinder::_singleton;
+
+// added by peter
+// TODO: put into Csmag.cpp and make sure csmag files are added to compile path
+
+Csmag::Csmag() {
+
+    csmag_state = new CsmagState();
+    csmag_state->time_usec = 0;
+    int i;
+    for (i = 0; i < CSMAG0_INDUCTION_ARRAY_SIZE; i++) {
+        csmag_state->induction[i] = CSMAG_INVALID_INDUCTION_VALUE;
+    }
+    _singleton = this;
+
+    // if (ISDOVERBOSEINITPRINTOUTS) {
+    //     printf("called Csmag::Csmag()\n");          // gets called in the very beginning (probably when this class is included)
+    // }
+}
+
+Csmag *Csmag::_singleton;
+
+
+
+
+CsmagStateBuffer::CsmagStateBuffer() {
+
+    buf = new Csmag::CsmagState*[CSMAG_BUFFER_SIZE];
+    int i;
+    for (i = 0; i < CSMAG_BUFFER_SIZE; i++) {
+        buf[i] = nullptr;
+    }
+    object_counter = 0;
+    first_index = INVALID_INDEX;
+    next_index = 0;
+    // set all available buffer slots as free
+    is_free_mask = (1 << CSMAG_BUFFER_SIZE) - 1;    // get CSMAG_BUFFER_SIZE bits, rest is 0 (not free)
+
+    // ..
+
+    _singleton = this;
+}
+
+// push object to the end of ring queue buffer
+// return true if pushing went successfully
+bool CsmagStateBuffer::push(Csmag::CsmagState *new_obj) {
+    //bool ret = false;
+    if (is_full()) {
+        // TODO: overwrite first object
+        printf("ERROR! CsmagStateBuffer buffer overflow\n");
+        //throw "CsmagStateBuffer buffer overflow";   // throw disabled
+        return false;
+    }
+    // TODO: perhaps check if it is actually free (in mask)
+    buf[next_index] = new_obj;
+    if (object_counter == 0) {
+        first_index = next_index;   // the new first index, if no object has been stored before
+    }
+    mark_occupied(next_index);
+    //next_index++;
+    next_index = (next_index + 1) % CSMAG_BUFFER_SIZE;
+    object_counter++;
+    //
+    return true;
+}
+
+// pop object at relativeIndex (counting from first_index with 0), defaultly pop first object
+Csmag::CsmagState* CsmagStateBuffer::pop(int relative_index) {
+    //throw "This is not implemented yet";
+    printf("ERROR! This is not implemented yet\n");
+    return nullptr;
+    // TODO: implement defragmentation if objects from the middle are popped
+
+    int absolute_index = (first_index + relative_index) % CSMAG_BUFFER_SIZE;
+    // check is there is actually an object
+    if (is_free(absolute_index)) {
+        //throw "CsmagStateBuffer does not contain an object at the given relative_index";
+        printf("ERROR! CsmagStateBuffer does not contain an object at the given relative_index\n");
+    }
+    //
+    mark_free(absolute_index);
+    //first_index++;
+    first_index = (first_index + 1) % CSMAG_BUFFER_SIZE;
+    object_counter--;
+    return buf[absolute_index];
+}
+
+// pop first object at (relative_index 0, counting from first_index with 0)
+Csmag::CsmagState* CsmagStateBuffer::pop() {
+    int relative_index = 0;                     
+    int absolute_index = (first_index + relative_index) % CSMAG_BUFFER_SIZE;
+    // check is there is actually an object
+    if (is_free(absolute_index)) {
+        //throw "CsmagStateBuffer does not contain an object at the given relative_index";
+        printf("ERROR! CsmagStateBuffer does not contain an object at the given relative_index\n");
+    }
+    //
+    mark_free(absolute_index);
+    //first_index++;
+    first_index = (first_index + 1) % CSMAG_BUFFER_SIZE;
+    object_counter--;
+    return buf[absolute_index];
+}
+
+// print n as binary digits on console
+void CsmagStateBuffer::print_bits(uint32_t n) {
+    uint32_t p;
+    for (p = 1 << (8 * sizeof(n) - 1); p > 0; p >>= 1) {
+        printf("%d", (bool) (n & p));
+    }
+}
+
+void CsmagStateBuffer::print_info() {
+    printf("\n");
+    printf("info of CsmagStateBuffer object at %p:\n", this);
+    printf("contained objects: %d of max %d\n", object_counter, CSMAG_BUFFER_SIZE);
+    printf("first_index: %d, next_index: %d\n", first_index, next_index);
+    printf("is_free_mask: 0x%x\n", is_free_mask);
+    printf("is_free_mask: 0b"); print_bits(is_free_mask); printf("\n");
+    printf("\n");
+}
+
+CsmagStateBuffer *CsmagStateBuffer::_singleton;
+
+
+
+
+// TODO: fix from HERE
+
+template<typename T>
+RingBuffer<T>::RingBuffer(int _buffer_size) {
+    buffer_size = _buffer_size;
+// template<typename T>
+// RingBuffer<T>::RingBuffer(const int &_buffer_size) :
+//     buffer_size(_buffer_size) {
+
+    buf = new T[buffer_size];                          // should work in C++, even with dynamic variable
+    
+    int i;
+    for (i = 0; i < buffer_size; i++) {
+        buf[i] = 0;                                     // TODO: mark as invalid???
+    }
+    object_counter = 0;
+    first_index = INVALID_INDEX;
+    next_index = 0;
+    // set all available buffer slots as free
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    is_free_mask = (1 << buffer_size) - 1;    // get buffer_size bits, rest is 0 (not free)
+#endif
+
+    // ..
+
+    _singleton = this;
+}
+
+// push object to the end of ring queue buffer
+// return true if pushing went successfully
+template<typename T>
+bool RingBuffer<T>::enqueue(T new_obj) {
+    //bool ret = false;
+    if (is_full()) {
+        // TODO: overwrite first object
+        printf("WARNING! RingBuffer<T> buffer overflow, old objects get overwritten\n");
+        //throw "CsmagStateBuffer buffer overflow";   // throw disabled
+        //return false;
+    }
+    // TODO: perhaps check if it is actually free (in mask)
+    buf[next_index] = new_obj;
+    if (object_counter == 0) {
+        first_index = next_index;   // the new first index, if no object has been stored before
+    }
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    mark_occupied(next_index);
+#endif
+    //next_index++;
+    next_index = (next_index + 1) % buffer_size;
+    object_counter++;
+    //
+    return true;
+}
+
+// pop first object at (relative_index 0, counting from first_index with 0)
+template<typename T>
+T RingBuffer<T>::dequeue() {
+    int relative_index = 0;                     
+    int absolute_index = (first_index + relative_index) % buffer_size;
+    // check is there is actually an object
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    if (is_free(absolute_index)) {
+        //throw "CsmagStateBuffer does not contain an object at the given relative_index";
+        printf("ERROR! RingBuffer does not contain an object at the given relative_index\n");
+    }
+    //
+    mark_free(absolute_index);
+#endif
+    //first_index++;
+    first_index = (first_index + 1) % buffer_size;
+    object_counter--;
+    return buf[absolute_index];
+}
+
+// print n as binary digits on console
+template<typename T>
+void RingBuffer<T>::print_bits(uint32_t n) {
+    uint32_t p;
+    for (p = 1 << (8 * sizeof(n) - 1); p > 0; p >>= 1) {
+        printf("%d", (bool) (n & p));
+    }
+}
+
+template<typename T>
+void RingBuffer<T>::print_info() {
+    printf("\n");
+    printf("info of RingBuffer object at %p:\n", this);
+    printf("contained objects: %d of max %d\n", object_counter, buffer_size);
+    printf("first_index: %d, next_index: %d\n", first_index, next_index);
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    printf("is_free_mask: 0x%x\n", is_free_mask);
+    printf("is_free_mask: 0b"); print_bits(is_free_mask); printf("\n");
+#endif
+    printf("\n");
+}
+
+template<typename T>                                                    // TODO: verify: does this work?
+RingBuffer<T> *RingBuffer<T>::_singleton;
+
+
+
+
+// since there seems to be some problem with RingBuffer using templates, let's try fixed data type int32_t for induction values:
+
+RingBufferInt32::RingBufferInt32(int _buffer_size) {
+    buffer_size = _buffer_size;
+// template<typename int32_t>
+// RingBufferInt32::RingBuffer(const int &_buffer_size) :
+//     buffer_size(_buffer_size) {
+
+    buf = new int32_t[buffer_size];                          // should work in C++, even with dynamic variable
+    
+    int i;
+    for (i = 0; i < buffer_size; i++) {
+        buf[i] = 0;                                     // TODO: mark as invalid???
+    }
+    object_counter = 0;
+    first_index = INVALID_INDEX;
+    next_index = 0;
+    // set all available buffer slots as free
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    is_free_mask = (1 << buffer_size) - 1;    // get buffer_size bits, rest is 0 (not free)
+#endif
+
+    // ..
+
+    _singleton = this;
+}
+
+// push object to the end of ring queue buffer
+// return true if pushing went successfully
+bool RingBufferInt32::enqueue(int32_t new_obj) {
+    //bool ret = false;
+    if (is_full()) {
+        // TODO: overwrite first object
+        printf("WARNING! RingBufferInt32 buffer overflow, old objects get overwritten\n");
+        //throw "CsmagStateBuffer buffer overflow";   // throw disabled
+        //return false;
+    }
+    // TODO: perhaps check if it is actually free (in mask)
+    buf[next_index] = new_obj;
+    if (object_counter == 0) {
+        first_index = next_index;   // the new first index, if no object has been stored before
+    }
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    mark_occupied(next_index);
+#endif
+    //next_index++;
+    next_index = (next_index + 1) % buffer_size;
+    object_counter++;
+    //
+    return true;
+}
+
+// pop first object at (relative_index 0, counting from first_index with 0)
+int32_t RingBufferInt32::dequeue() {
+    int relative_index = 0;                     
+    int absolute_index = (first_index + relative_index) % buffer_size;
+    // check is there is actually an object
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    if (is_free(absolute_index)) {
+        //throw "CsmagStateBuffer does not contain an object at the given relative_index";
+        printf("ERROR! RingBufferInt32 does not contain an object at the given relative_index\n");
+    }
+    //
+    mark_free(absolute_index);
+#endif
+    //first_index++;
+    first_index = (first_index + 1) % buffer_size;
+    object_counter--;
+    return buf[absolute_index];
+}
+
+// print n as binary digits on console
+template<typename INTTYPE>
+void RingBufferInt32::print_bits(INTTYPE n) {
+    INTTYPE p;
+    for (p = ( (INTTYPE) 1) << (8 * sizeof(n) - 1); p > 0; p >>= 1) {
+        printf("%d", (bool) (n & p));
+    }
+}
+
+void RingBufferInt32::print_info() {
+    printf("\n");
+    printf("info of RingBuffer object at %p:\n", this);
+    printf("contained objects: %d of max %d\n", object_counter, buffer_size);
+    printf("first_index: %d, next_index: %d\n", first_index, next_index);
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    printf("is_free_mask: 0x%x\n", is_free_mask);
+    printf("is_free_mask: 0b"); print_bits(is_free_mask); printf("\n");
+#endif
+    printf("\n");
+}
+
+RingBufferInt32 *RingBufferInt32::_singleton;
+
+
+
+// CONTINUE HERE
+//InductionValueBuffer *InductionValueBuffer
+
+
+
+
+// since there seems to be some problem with RingBuffer using templates, let's try fixed data type int64_t for induction values:
+
+RingBufferUInt64::RingBufferUInt64(int _buffer_size) {
+    buffer_size = _buffer_size;
+
+    buf = new uint64_t[buffer_size];                          // should work in C++, even with dynamic variable
+    
+    int i;
+    for (i = 0; i < buffer_size; i++) {
+        buf[i] = 0;                                     // TODO: mark as invalid???
+    }
+    object_counter = 0;
+    first_index = INVALID_INDEX;
+    next_index = 0;
+    // set all available buffer slots as free
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    is_free_mask = (1 << buffer_size) - 1;    // get buffer_size bits, rest is 0 (not free)
+#endif
+
+    // ..
+
+    _singleton = this;
+}
+
+// push object to the end of ring queue buffer
+// return true if pushing went successfully
+bool RingBufferUInt64::enqueue(uint64_t new_obj) {
+    //bool ret = false;
+    if (is_full()) {
+        // TODO: overwrite first object
+        printf("ERROR! RingBufferUInt64 buffer overflow\n");
+        //throw "CsmagStateBuffer buffer overflow";   // throw disabled
+        return false;
+    }
+    // TODO: perhaps check if it is actually free (in mask)
+    buf[next_index] = new_obj;
+    if (object_counter == 0) {
+        first_index = next_index;   // the new first index, if no object has been stored before
+    }
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    mark_occupied(next_index);
+#endif
+    //next_index++;
+    next_index = (next_index + 1) % buffer_size;
+    object_counter++;
+    //
+    return true;
+}
+
+// pop first object at (relative_index 0, counting from first_index with 0)
+uint64_t RingBufferUInt64::dequeue() {
+    int relative_index = 0;                     
+    int absolute_index = (first_index + relative_index) % buffer_size;
+    // check is there is actually an object
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    if (is_free(absolute_index)) {
+        //throw "CsmagStateBuffer does not contain an object at the given relative_index";
+        printf("ERROR! RingBufferUInt64 does not contain an object at the given relative_index\n");
+    }
+    //
+    mark_free(absolute_index);
+#endif
+    //first_index++;
+    first_index = (first_index + 1) % buffer_size;
+    object_counter--;
+    return buf[absolute_index];
+}
+
+// print n as binary digits on console
+template<typename INTTYPE>
+void RingBufferUInt64::print_bits(INTTYPE n) {
+    INTTYPE p;
+    for (p = ( (INTTYPE) 1) << (8 * sizeof(n) - 1); p > 0; p >>= 1) {
+        printf("%d", (bool) (n & p));
+    }
+}
+
+void RingBufferUInt64::print_info() {
+    printf("\n");
+    printf("info of RingBuffer object at %p:\n", this);
+    printf("contained objects: %d of max %d\n", object_counter, buffer_size);
+    printf("first_index: %d, next_index: %d\n", first_index, next_index);
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    printf("is_free_mask: 0x%x\n", is_free_mask);
+    printf("is_free_mask: 0b"); print_bits(is_free_mask); printf("\n");
+#endif
+    printf("\n");
+}
+
+RingBufferUInt64 *RingBufferUInt64::_singleton;

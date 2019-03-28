@@ -23,6 +23,10 @@
 #include <AP_VisualOdom/AP_VisualOdom.h>
 #include <AP_Common/AP_FWVersion.h>
 
+#include <DebugDefines.h>                       // added by peter
+
+#define GCS_DEBUG_SEND_MESSAGE_TIMINGS 0
+
 // check if a message will fit in the payload space available
 #define PAYLOAD_SIZE(chan, id) (GCS_MAVLINK::packet_overhead_chan(chan)+MAVLINK_MSG_ID_ ## id ## _LEN)
 #define HAVE_PAYLOAD_SPACE(chan, id) (comm_get_txspace(chan) >= PAYLOAD_SIZE(chan, id))
@@ -75,6 +79,7 @@ enum ap_message : uint8_t {
     MSG_PID_TUNING,
     MSG_VIBRATION,
     MSG_RPM,
+    MSG_CSMAG0,                                 // added manually by peter
     MSG_MISSION_ITEM_REACHED,
     MSG_POSITION_TARGET_GLOBAL_INT,
     MSG_ADSB_VEHICLE,
@@ -197,6 +202,18 @@ public:
     void send_servo_output_raw();
     static void send_collision_all(const AP_Avoidance::Obstacle &threat, MAV_COLLISION_ACTION behaviour);
     void send_accelcal_vehicle_position(uint32_t position);
+
+    // added by peter
+    void send_csmag0();                       // for now in Copter class
+#if ISDOVERBOSECSMAGPRINTOUTS
+    int csmagDebugPrintCounter;             // don't print every message, just NUMBEROFCSMAGPRINTOUTS, to prevent from poulluting console
+#endif
+#if ISPRINTMESSAGESINTOFILE
+    FILE *log_fp;                               // file pointer for logfile, added by peter
+    int tally_list[MSG_LAST+1];
+    int msgCounter;
+#endif
+
 
     // return a bitmap of active channels. Used by libraries to loop
     // over active channels to send to all active channels    

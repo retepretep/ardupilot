@@ -100,6 +100,26 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if RANGEFINDER_ENABLED == ENABLED
     SCHED_TASK(read_rangefinder,      20,    100),
 #endif
+    // added new messages by Peter {
+    ////SCHED_TASK(update_csmag,     (50/10),     10),           // 10 values for CSMAG0 message, sampling rate 50 Hz // works
+    // SCHED_TASK(update_csmag,     (2*50/10),     10),           // 2x as fast to catch unsent messages // works
+#if (!ISUSESLOMOCSMAG)
+    SCHED_TASK(read_csmag, (CSMAG_INDUCTION_VALUE_SAMPLE_RATE), 40),
+    SCHED_TASK(check_send_csmag, (2 * CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE), 100),            //
+#else
+    SCHED_TASK(read_csmag, (int) (CSMAG_INDUCTION_VALUE_SAMPLE_RATE / SLOMOFACTOR), 40),
+    //SCHED_TASK(check_send_csmag, (2 * CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE / SLOMOFACTOR), 40),            //
+    //SCHED_TASK(check_send_csmag, (int) MAX(1 , (int) (2 * CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE / SLOMOFACTOR) ), 40),            //
+    #if SLOMOFACTOR == 50
+        SCHED_TASK(check_send_csmag, 1, 100),            // no lower frequency possible than 1 Hz
+    #else
+        SCHED_TASK(check_send_csmag, (2 * CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE / SLOMOFACTOR), 100),            //
+    #endif
+#endif
+    ////SCHED_TASK(update_csmag,     (1),     10),           // 10 values for CSMAG0 message, sampling rate 50 Hz // slower for debug readability
+    // TODO: a bit more often? And then wait if necessary?
+    // TODO: precise enough?
+    // } 
 #if PROXIMITY_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Proximity,         &copter.g2.proximity,        update,         100,  50),
 #endif
@@ -203,6 +223,15 @@ void Copter::setup()
     StorageManager::set_layout_copter();
 
     init_ardupilot();
+
+    if (ISDODEBUGPRINTOUTS) {
+        // print on arducopter console (xterminal when running SITL)
+        printf("Hiho :)\n");
+
+        // print on GCS (SITL console or mission planner)
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Hey ho :) %6.4f", (double)3.1416f);
+        // this is a new comment from 190306T1150+0100
+    }
 
     // initialise the main loop scheduler
     scheduler.init(&scheduler_tasks[0], ARRAY_SIZE(scheduler_tasks), MASK_LOG_PM);
@@ -572,5 +601,17 @@ void Copter::update_altitude()
         Log_Write_Control_Tuning();
     }
 }
+
+// TODO: remove update_csmag
+// added by peter {
+void Copter::update_csmag(void) {
+    printf("THIS IS DEPRECATED!!!\n");
+    abort();
+    // TODO: read real csmag
+    read_csmag();   // from sensors.cpp
+    // send csmag message
+    gcs().send_message(MSG_CSMAG0);
+}
+// }
 
 AP_HAL_MAIN_CALLBACKS(&copter);

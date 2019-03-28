@@ -71,6 +71,436 @@ bool Copter::rangefinder_alt_ok()
     return (rangefinder_state.enabled && rangefinder_state.alt_healthy);
 }
 
+// added by peter {
+
+// initialize csmag
+// called in Copter::init_ardupilot(...) in system.cpp 
+bool Copter::init_csmag(void) {
+
+    is_first_csmag_message = true;
+
+#if ISDOREPEATEDGCSMESSAGE
+    // time_since_start = 0;                   // init counter
+    // time_last_repeated_gcs_message = 0;
+    // write message at the beginning
+    time_since_start = AP_HAL::micros64();                   // init counter
+    time_last_repeated_gcs_message = time_since_start - GCSMESSAGEINTERVAL;
+#endif
+
+#if ISDOVERBOSECSMAGPRINTOUTS    
+    csmagDebugPrintCounter = 0;             // TODO: add conditioned declaration and use
+#endif
+
+    if (ISDOVERBOSEINITPRINTOUTS) {
+        RangeFinder *rf = RangeFinder::get_singleton();
+        printf("rf: %p\n", rf);
+    }
+
+    if (CSMAG_IS_USE_BUFFER_MODE) {
+        // csmag state buffer init
+        CsmagStateBuffer *csmag_state_buffer = CsmagStateBuffer::get_singleton();   // works
+
+        if (ISDOBUFFERDEBUGPRINTOUTS || ISDOVERBOSEINITPRINTOUTS) {
+            printf("(C10) csmag_state_buffer after get_singleton():\n");
+            csmag_state_buffer->print_info();
+        }
+    }
+
+
+    
+
+    Csmag *csmag = Csmag::get_singleton();
+
+    if (ISDOVERBOSEINITPRINTOUTS) {
+        printf("(B10) Copter::init_csmag(): \n");
+        printf("(B20) csmag: %p\n", csmag);
+        printf("(B30) csmag->csmag_state: %p\n", csmag->csmag_state);
+        printf("(B40) csmag->csmag_state->induction: %p\n", csmag->csmag_state->induction);
+        printf("(B50) csmag->csmag_state->induction[0]: %d\n", csmag->csmag_state->induction[0]);
+    }
+
+    //printf("line %d ok.\n", __LINE__);                    // works
+    //csmag->csmag_state->induction[0] = 148;               // works
+    
+    if (ISDOVERBOSEINITPRINTOUTS) {
+        printf("line %d ok.\n", __LINE__);                    // works
+        printf("(B10) Copter::init_csmag(): \n");
+        printf("(B20) csmag->csmag_state->induction[0]: %d\n", csmag->csmag_state->induction[0]);
+    }
+
+    // some compilation error when using template class singleton:
+    /*
+    [527/527] Linking build/sitl/bin/arducopter
+    ArduCopter/Copter.cpp.25.o: In function `Copter::Copter()':
+    Copter.cpp:(.text._ZN6CopterC2Ev+0x11f): undefined reference to `RingBuffer<int>::RingBuffer(int)'
+    ArduCopter/sensors.cpp.25.o: In function `Copter::init_csmag()':
+    sensors.cpp:(.text._ZN6Copter10init_csmagEv+0x10): undefined reference to `RingBuffer<int>::_singleton'
+    sensors.cpp:(.text._ZN6Copter10init_csmagEv+0x22): undefined reference to `RingBuffer<int>::print_info()'
+    collect2: error: ld returned 1 exit status
+
+    perhaps problem with singletons in template classes???
+    */
+    //RingBuffer<int32_t> *induction_value_buffer = RingBuffer<int32_t>::get_singleton();
+
+    RingBufferInt32 *induction_value_buffer = RingBufferInt32::get_singleton();
+
+    if (ISDOBUFFERDEBUGPRINTOUTS || ISDOVERBOSEINITPRINTOUTS) {
+        printf("(D10) induction_value_buffer after get_singleton():\n");
+        induction_value_buffer->print_info();
+    }
+    
+    RingBufferUInt64 *induction_value_timestamp_buffer = RingBufferUInt64::get_singleton();
+    
+
+    if (ISDOBUFFERDEBUGPRINTOUTS || ISDOVERBOSEINITPRINTOUTS) {
+        printf("(E10) induction_value_timestamp_buffer after get_singleton():\n");
+        induction_value_timestamp_buffer->print_info();
+    }
+
+    // init UART 
+    // TODO: properly use serial manager (cf. Rangefinder), doublecheck uart init
+    // for now using https://github.com/ArduPilot/ardupilot/blob/master/libraries/AP_HAL/examples/UART_test/UART_test.cpp
+
+    AP_HAL::UARTDriver *uart;
+    // TODO: more elegant UART handling, if necessary?
+    //uart_csmag_data = hal.uartC;            // use UART C (TELEM1 on Pixhawk1) for reading magnetometer data
+    uart_csmag_data = UART_FOR_CSMAG_DATA;
+
+    uart_csmag_data->begin(MAGNETOMETER_SERIAL_BAUDRATE);   // TODO: check configuration and baudrate, load it from configurations
+
+    if (ISDOMAGDATAREADUARTCHECK) {
+        printf("inited UART: %p\n", uart_csmag_data);
+        printf("nullptr: %p\n", nullptr);
+    }
+
+    //hal.scheduler->delay(1000); //Ensure that the uartA can be initialized
+    if (ISDOVERBOSEUARTCHECK) {
+        //AP_HAL::UARTDriver *uart;
+        //uart = hal.uartC;
+        uart = uart_csmag_data;
+        
+        uart->printf("Hello - this is TELEM1!\n");
+        //hal.uartC->printf("Hello - this is TELEM1!\n");
+    }
+
+   return true;
+}
+
+void Copter::read_csmag(void) {
+
+    if (ISPRINTTIMESTAMPREADCSMAG) {
+        hal.console->printf("Copter::read_csmag() at %" PRIu64 "\n", AP_HAL::micros64());
+    }
+
+    Csmag *_csmag;
+
+    uint32_t induction_value_maginterface_timestamp_i = 0;
+    int32_t _induction_value_i = CSMAG_INVALID_INDUCTION_VALUE;
+    //uint16_t count;
+    int16_t nbytes; // = uart_csmag_data->available();
+    bool is_timestamp_mode;// = false;
+    bool is_induction_mode;// = false;
+    int values_remaining_bytes = 4;
+
+    if (ISDOMAGDATAREADUARTCHECK) {
+        printf("UART: %p\n", uart_csmag_data);
+    }
+
+    if (uart_csmag_data != nullptr) {
+
+        if (ISDOMAGDATAREADUARTCHECK) {
+            printf("read from UART (as hexdump):\n", uart_csmag_data);
+        }
+
+        nbytes = uart_csmag_data->available();
+        is_timestamp_mode = false;
+        is_induction_mode = false;
+        //int values_remaining_bytes = 4;
+        uint8_t c;
+        while (nbytes-- > 0) {
+            //char c = uart_csmag_data->read();
+            c = uart_csmag_data->read();
+
+            if (ISDOMAGDATAREADUARTCHECK) {
+                printf("%02x ", c);
+            }
+
+            if (is_timestamp_mode) {
+                // read uint32_t timestamp
+                if (IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN) {
+                    induction_value_maginterface_timestamp_i <<= 8 * sizeof(c);
+                    induction_value_maginterface_timestamp_i |= c;
+                } else {
+                    // TODO: implement little endian
+                    hal.console->printf("Error! Reading MAGInterface data in little endian is not implemented yet.\n");
+                }
+                values_remaining_bytes--;
+            } else if (is_induction_mode) {
+                // read int32_t induction value
+                if (IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN) {
+                    _induction_value_i <<= 8 * sizeof(c);
+                    _induction_value_i |= c;
+                } else {
+                    // TODO: implement little endian
+                    hal.console->printf("Error! Reading MAGInterface data in little endian is not implemented yet.\n");
+                }
+                values_remaining_bytes--;
+            } else {
+                // default mode: check for state
+                switch (c) {
+                case 'T':
+                    is_timestamp_mode = true;
+                    is_induction_mode = false;
+                    values_remaining_bytes = 4;                     // type uint32_t
+                    induction_value_maginterface_timestamp_i = 0;   // init value
+                    break;
+                case 'I':
+                    is_timestamp_mode = false;
+                    is_induction_mode = true;
+                    values_remaining_bytes = 4;                     // type int32_t
+                    _induction_value_i = 0;
+                    break;
+                }
+            }
+
+            if (values_remaining_bytes <= 0) {
+                // number (timestamp or induction value) has been read
+
+                // push new timestamp or induction value
+                if (CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
+
+                    if (ISDOTEMPVERBOSEDEBUG) {
+                        hal.console->printf("X");
+                    }
+
+                    if (is_timestamp_mode) {
+                        induction_value_timestamp_buffer.enqueue(induction_value_maginterface_timestamp_i);
+                    } else if (is_induction_mode) {
+                        induction_value_buffer.enqueue(_induction_value_i);
+                    } else {
+                        // invalid mode
+                        // should only happen in the beginning
+                        hal.console->printf("Warning! Copter::read_csmag() couldn't read data.\n");
+                    }
+
+                    if (ISMONITORCHECKCSMAG) {
+                        printf("+");
+                        printf("%x", induction_value_buffer.GetObjectCounter());
+                        printf("%x", induction_value_timestamp_buffer.GetObjectCounter());
+                    }
+
+                } else {
+                    printf("WARNING! Please use CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE, using IS_GENERATE_FAKE_CSMAG_STATE is deprecated\n");
+                }
+
+                // go back to default mode after the according number of bytes has been read out
+                is_timestamp_mode = false;
+                is_induction_mode = false;
+            }
+        }
+    } else {
+        // TODO: some exception handling
+        hal.console->printf("Error! Can't find UART C.\n");
+    }
+
+    if (ISDOMAGDATAREADUARTCHECK) {
+        printf("\nEnd of UART data\n");
+    }
+
+    // TODO: convert arduino timestamp to pixhawk timestamp
+    //induction_value_timestamp_i = induction_value_maginterface_timestamp_i;
+    //induction_value_i = _induction_value_i;
+
+    // using fake data for now
+    
+    // begin of fake data generation
+
+    if (IS_GENERATE_FAKE_CSMAG_STATE) {
+        printf("WARNING!!! IS_GENERATE_FAKE_CSMAG_STATE is deprecated, use IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES instead\n");
+
+        Csmag *_csmag = new Csmag();            // costs a lot of time TODO: remove this
+        
+        _csmag->csmag_state->time_usec = AP_HAL::micros64();
+        //
+        int i;
+        for (i = 0; i < CSMAG_INDUCTION_ARRAY_SIZE; i++) {
+            _csmag->csmag_state->induction[i] = i;              
+        }
+        _csmag->csmag_state->induction[0] = 42;
+        _csmag->csmag_state->induction[1] = _csmag->csmag_state->time_usec / ( (typeof(_csmag->csmag_state->induction[1])) 1e6 ) ;        // =full seconds 
+        _csmag->csmag_state->induction[2] = _csmag->csmag_state->time_usec % 100;        // last 2 digits of time_usec
+        // some sine wave: periode T=2*pi s, amplitude y = +- 100 units
+        _csmag->csmag_state->induction[3] = (typeof(_csmag->csmag_state->induction[3])) (100 * sinf(_csmag->csmag_state->time_usec /  1e6));   
+    }
+
+    if (IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES) {
+        //induction_value_timestamp_i = AP_HAL::micros64();
+        induction_value_maginterface_timestamp_i = AP_HAL::micros64();
+        if (IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES_SIN) {
+            //induction_value_i = (typeof(induction_value_i)) (100 * sin(induction_value_timestamp_i /  1e6));   
+            _induction_value_i = (typeof(_induction_value_i)) (100 * sinf(induction_value_maginterface_timestamp_i /  1e6));   
+            
+            //induction_value_i = (typeof(induction_value_i)) (100 * sin(induction_value_timestamp_i /  1e6 / CSMAG_INDUCTION_ARRAY_SIZE));   
+        } else {
+            //induction_value_i = 42;                     // generate constant output of 42
+            _induction_value_i = 42;                     // generate constant output of 42
+        }
+    }
+    
+    // end of fake data generation
+
+    // pushing the new status with 50 Hz only makes sense, if we generate fake csmag buffer states
+    // normally we'd want to to this only in check_send_csmag
+    if (CSMAG_IS_USE_BUFFER_MODE && IS_GENERATE_FAKE_CSMAG_STATE) {
+        if (ISDOBUFFERDEBUGPRINTOUTS) {
+            csmag_state_buffer.print_info();
+            printf("push most recent state.\n");
+        }
+        
+        csmag_state_buffer.push(_csmag->csmag_state);
+        
+        if (ISDOBUFFERDEBUGPRINTOUTS) {
+            csmag_state_buffer.print_info();
+            printf("after push---\n");
+        }
+
+        csmag = *_csmag;    // set Csmag singleton to most recent csmag (redundant in buffer mode)
+    }
+
+    // if necessary, send a customary message to gcs, to prove the new cusom arducopter code is running 
+#if ISDOREPEATEDGCSMESSAGE
+    time_since_start = AP_HAL::micros64();      // update time
+    if (time_since_start - time_last_repeated_gcs_message > GCSMESSAGEINTERVAL)  {
+        //gcs().send_text(MAV_SEVERITY_CRITICAL, "Hey ho :) %6.4f", (double)3.1416f);
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Hals- und Beinbruch :)");
+        time_last_repeated_gcs_message = time_since_start;
+
+        if (ISDOVERBOSEUARTCHECK) {
+            AP_HAL::UARTDriver *uart;
+            int i;
+            int repeat_uart_msg = 10;
+
+            // // get's printed out in GCS
+            // // cannot change flight mode
+            // uart = hal.uartA;
+            // uart->printf("Hello UARTA!!!\n");
+            // for (i = 0; i < repeat_uart_msg; i++) {
+            //     uart->printf("Hello! ");
+            // }
+
+            uart = hal.uartB;
+            uart->printf("Hello UARTB!!!\n");
+            for (i = 0; i < repeat_uart_msg; i++) {
+                uart->printf("Hello! ");
+            }
+
+            uart = hal.uartC;
+            uart->printf("Hello UARTC!!!\n");
+            for (i = 0; i < repeat_uart_msg; i++) {
+                uart->printf("Hello! ");
+            }
+
+            uart = hal.uartD;
+            uart->printf("Hello UARTD!!!\n");
+            for (i = 0; i < repeat_uart_msg; i++) {
+                uart->printf("Hello! ");
+            }
+
+            uart = hal.uartE;
+            uart->printf("Hello UARTE!!!\n");
+            for (i = 0; i < repeat_uart_msg; i++) {
+                uart->printf("Hello! ");
+            }
+            
+            // hal.uartC->printf("Hello TELEM1!!!\n");
+            // for (i = 0; i < 100; i++) {
+            //     hal.uartC->printf("Hello! ");
+            // }
+        }
+    }
+#endif
+
+}
+
+
+// checks wether there are enough csmag induction values for a new message and tries to send it
+void Copter::check_send_csmag() {
+    uint32_t timestamp_comp_mag;            // comparatative timestamp from MAGInterface
+    uint64_t timestamp_comp_pix;            // comparatative timestamp from Pixhawk
+    int64_t _timestamp_comp_delta;           // Pixhawk time - MAGInterface time
+    //Csmag *_csmag = new Csmag();    // TODO: remove this
+    Csmag *_csmag = &csmag;
+    if (CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
+
+        if (ISMONITORCHECKCSMAG) {
+            printf("called Copter::check_send_csmag()\n");
+            printf("induction_value_buffer.GetObjectCounter(): %d\n", induction_value_buffer.GetObjectCounter());
+            printf("induction_value_timestamp_buffer.GetObjectCounter(): %d\n", induction_value_timestamp_buffer.GetObjectCounter());
+        }
+
+        // check if there are enough induction values for a new message
+        if (induction_value_buffer.GetObjectCounter() >= CSMAG_INDUCTION_ARRAY_SIZE) {
+            // if yes: form a message 
+            int i;
+            _csmag->csmag_state->time_usec = induction_value_timestamp_buffer.dequeue();    // use timestamp of first induction value
+            _csmag->csmag_state->induction[0] = induction_value_buffer.dequeue();
+            for (i = 1; i < CSMAG_INDUCTION_ARRAY_SIZE; i++) {
+                _csmag->csmag_state->induction[i] = induction_value_buffer.dequeue();       // fill induction array with induction values
+                induction_value_timestamp_buffer.dequeue();                                 // throw away other timestamps
+                // we might check here if the samplerate is correct, before throwing the timestamps away
+            }
+
+            // synchronize timestamps
+            //CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE
+            // if (is_first_csmag_message) {
+            //     // only synchronize in first message
+            //     // TODO: think about when/how often to synchronize
+            //     // TODO: synchronize it in interval?
+            //     timestamp_comp_mag = _csmag->csmag_state->time_usec;                            // first timestamp of this future message from MAGClient
+            //     timestamp_comp_pix = AP_HAL::micros64();
+            //     timestamp_comp_delta = timestamp_comp_pix - timestamp_comp_mag;
+            //     is_first_csmag_message = false;
+            // }
+            timestamp_comp_mag = _csmag->csmag_state->time_usec;                            // first timestamp of this future message from MAGClient
+            timestamp_comp_pix = AP_HAL::micros64();
+            _timestamp_comp_delta = timestamp_comp_pix - timestamp_comp_mag;
+
+            if (is_first_csmag_message || ( (_timestamp_comp_delta - timestamp_comp_delta) >  CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE) ) {
+                // if first message OR timestamp_comp_delta changed more than the threshold:
+                timestamp_comp_delta = _timestamp_comp_delta;   // synchronize again
+                is_first_csmag_message = false;
+            }
+
+            // use Pixhawk timestamp instead of MAGInterface timestamp
+            _csmag->csmag_state->time_usec += timestamp_comp_delta;
+
+            if (CSMAG_IS_USE_BUFFER_MODE) {
+                csmag_state_buffer.push(_csmag->csmag_state);
+            }
+            csmag = *_csmag; // set Csmag singleton to most recent csmag (redundant in buffer mode)
+
+            // and send the message
+            gcs().send_message(MSG_CSMAG0);
+
+            if (ISMONITORCHECKCSMAG) {
+                printf("send CSMAG0 message\n");
+            }
+        }
+    } else {
+        printf("Warning! Use CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE! Non buffer mode is deprecated.\n");
+        if (CSMAG_IS_USE_BUFFER_MODE) {
+                csmag_state_buffer.push(_csmag->csmag_state);
+            }
+            csmag = *_csmag; // set Csmag singleton to most recent csmag (redundant in buffer mode)
+
+            // and send the message
+            gcs().send_message(MSG_CSMAG0);
+    }
+}
+
+
+// }
+
 /*
   update RPM sensors
  */

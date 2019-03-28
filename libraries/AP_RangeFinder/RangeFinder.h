@@ -183,3 +183,256 @@ private:
 
     bool _add_backend(AP_RangeFinder_Backend *driver);
 };
+
+// added by peter
+// tried to use separate AP_Csmag/Csmag.h, but couldn't add this to compile process
+// TEMPORARY workaround, TODO: fix this
+#include <../ArduCopter/defines.h>  // for array size
+
+// need to add backend (drivers) for CSMAG
+class Csmag {
+public:
+    Csmag();                                    // ctor
+    // we declare a virtual destructor so that CSMAG (cf. RangeFinder) drivers can
+    // override with a custom destructor if need be
+    virtual ~Csmag() {};                    // dtor
+    //
+    struct CsmagState {
+        uint64_t    time_usec;
+        int32_t     induction[CSMAG_INDUCTION_ARRAY_SIZE];
+        // TODO: array with fixed size of pointer?
+    };
+    //
+    //CsmagState *get_state() = { return csmag_state; }
+
+    static Csmag *get_singleton(void) { return _singleton; }
+
+    CsmagState *csmag_state;
+
+private:
+    static Csmag *_singleton;
+};
+
+// TODO: add 2 different buffer size variables (1 config and 1 for the class)
+
+// singleton style queue buffer for Csmag::CsmagState type pointers, in order to enable reaching them from within GCS_Mavlink AND Copter class
+class CsmagStateBuffer {
+public:
+    CsmagStateBuffer();
+    virtual ~CsmagStateBuffer() {};     // cf RangeFinder backend
+
+    bool is_full() { return is_free_mask == 0; } // no free slot? ==> isFull
+    bool push(Csmag::CsmagState *new_obj);  // push object to buffer
+    //Csmag::CsmagState *pop(int relative_index=0); // would be nice
+    Csmag::CsmagState *pop(int relative_index);     // need to implement defragmentation
+    Csmag::CsmagState *pop();                   // only pop first in queue
+    int GetObjectCounter() { return object_counter; }
+    uint32_t GetIsFreeMask() { return is_free_mask; }
+
+    static const int INVALID_INDEX = -1;
+
+    static CsmagStateBuffer *get_singleton(void) { return _singleton; }
+
+    void print_bits(uint32_t n);
+    void print_info(void);             // for debug purposes
+    
+
+private:
+    void mark_free(int index) { is_free_mask |= (1 << index); }         // no checks
+    void mark_occupied(int index) { is_free_mask &= ~(1 << index); }    // no checks
+    bool is_free(int index) { return is_free_mask & (1 << index); }
+
+    Csmag::CsmagState **buf;            // objects are stored here
+    int first_index;           // pointing to first object
+    int next_index;            // buf index of next "free" element
+    uint32_t is_free_mask;              // indicating if this element DOES NOT contain a stored element
+    int object_counter;
+    static_assert(8*sizeof(is_free_mask) >= CSMAG_BUFFER_SIZE, "is_free_mask must have at least CSMAG_BUFFER_SIZE bits, to store the status");
+
+    static CsmagStateBuffer *_singleton;
+};
+
+
+template<typename T>
+class RingBuffer {
+public:
+    // need to use explicit?
+    // https://foonathan.net/blog/2017/10/11/explicit-assignment.html
+
+    explicit RingBuffer(int _buffer_size);
+    //RingBuffer(const int &_buffer_size);
+    // RingBuffer(int _buffer_size = CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+    // explicit RingBuffer(int _buffer_size = CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+    virtual ~RingBuffer() {};
+
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    bool is_full() { return is_free_mask == 0; }                            // no free slot? ==> is_full
+#else
+    bool is_full() { return first_index == next_index; }                    // would overwrite first item? ==> is_full
+#endif
+    //template<typename TT>
+    bool enqueue(T new_obj);                                               // push object to end buffer
+    //template<typename TT>
+    T dequeue();                                                           // only pop first in queue
+    int GetObjectCounter() { return object_counter; }
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    uint32_t GetIsFreeMask() { return is_free_mask; }
+#endif
+    int GetBufferSize() { return buffer_size; }
+
+    static const int INVALID_INDEX = -1;
+
+    static RingBuffer<T> *get_singleton(void) { return _singleton; }
+
+    void print_bits(uint32_t n);
+    void print_info(void);             // for debug purposes
+    
+
+private:
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    void mark_free(int index) { is_free_mask |= (1 << index); }             // no checks
+    void mark_occupied(int index) { is_free_mask &= ~(1 << index); }        // no checks
+    bool is_free(int index) { return is_free_mask & (1 << index); }
+#endif
+
+    T *buf;                                                                 // objects are stored here
+    int first_index;                                                        // pointing to first object
+    int next_index;                                                         // buf index of next "free" element
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    uint64_t is_free_mask;                                                  // indicating if this element DOES NOT contain a stored element
+    static_assert(8*sizeof(is_free_mask) >= CSMAG_BUFFER_SIZE, "is_free_mask must have at least CSMAG_BUFFER_SIZE bits, to store the status");
+#endif
+    int object_counter;
+    const int buffer_size;
+
+    static RingBuffer<T> *_singleton;
+};
+
+
+/*
+class RingBufferInt32 : public RingBuffer<int32_t> {
+    using RingBuffer<int32_t>::RingBuffer;
+};
+*/
+
+// since there seems to be some problem with RingBuffer using templates, let's try fixed data type int32_t for induction values:
+
+class RingBufferInt32 {
+public:
+    // need to use explicit?
+    // https://foonathan.net/blog/2017/10/11/explicit-assignment.html
+
+    RingBufferInt32(int _buffer_size);
+    //RingBuffer(const int &_buffer_size);
+    // RingBuffer(int _buffer_size = CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+    // explicit RingBuffer(int _buffer_size = CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+    virtual ~RingBufferInt32() {};
+
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    bool is_full() { return is_free_mask == 0; }                            // no free slot? ==> is_full
+#else
+    // would overwrite first item? ==> either FULL or EMPTY!
+    bool is_full() { return (first_index == next_index) && (GetObjectCounter() == GetBufferSize()); }
+#endif
+    bool enqueue(int32_t new_obj);                                               // push object to end buffer
+    int32_t dequeue();                                                           // only pop first in queue
+    int GetObjectCounter() { return object_counter; }
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    uint32_t GetIsFreeMask() { return is_free_mask; }
+#endif
+    int GetBufferSize() { return buffer_size; }
+
+    static const int INVALID_INDEX = -1;
+
+    static RingBufferInt32 *get_singleton(void) { return _singleton; }
+
+    template<typename INTTYPE>
+    void print_bits(INTTYPE n);
+    void print_info(void);             // for debug purposes
+    
+
+private:
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    void mark_free(int index) { is_free_mask |= (1 << index); }             // no checks
+    void mark_occupied(int index) { is_free_mask &= ~(1 << index); }        // no checks
+    bool is_free(int index) { return is_free_mask & (1 << index); }
+#endif
+
+    int32_t *buf;                                                                 // objects are stored here
+    int first_index;                                                        // pointing to first object
+    int next_index;                                                         // buf index of next "free" element
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    __uint128_t is_free_mask;                                                  // indicating if this element DOES NOT contain a stored element
+    static_assert(8*sizeof(is_free_mask) >= CSMAG_INDUCTION_VALUE_BUFFER_SIZE, "is_free_mask must have at least CSMAG_BUFFER_SIZE bits, to store the status");
+#endif
+    int object_counter;
+    /*const*/ int buffer_size;
+
+    static RingBufferInt32 *_singleton;
+};
+
+
+
+// CONTINUE HERE
+/*
+class InductionValueBuffer : RingBufferInt32 {
+    using RingBufferInt32::RingBufferInt32;
+};
+*/
+
+
+
+
+class RingBufferUInt64 {
+public:
+    // need to use explicit?
+    // https://foonathan.net/blog/2017/10/11/explicit-assignment.html
+
+    RingBufferUInt64(int _buffer_size);
+    //RingBuffer(const int &_buffer_size);
+    // RingBuffer(int _buffer_size = CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+    // explicit RingBuffer(int _buffer_size = CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+    virtual ~RingBufferUInt64() {};
+
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    bool is_full() { return is_free_mask == 0; }                            // no free slot? ==> is_full
+#else
+    // would overwrite first item? ==> either FULL or EMPTY!
+    bool is_full() { return (first_index == next_index) && (GetObjectCounter() == GetBufferSize()); }
+#endif
+    bool enqueue(uint64_t new_obj);                                               // push object to end buffer
+    uint64_t dequeue();                                                           // only pop first in queue
+    int GetObjectCounter() { return object_counter; }
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    __uint128_t GetIsFreeMask() { return is_free_mask; }
+#endif
+    int GetBufferSize() { return buffer_size; }
+
+    static const int INVALID_INDEX = -1;
+
+    static RingBufferUInt64 *get_singleton(void) { return _singleton; }
+
+    template<typename INTTYPE>
+    void print_bits(INTTYPE n);
+    void print_info(void);             // for debug purposes
+    
+
+private:
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    void mark_free(int index) { is_free_mask |= (1 << index); }             // no checks
+    void mark_occupied(int index) { is_free_mask &= ~(1 << index); }        // no checks
+    bool is_free(int index) { return is_free_mask & (1 << index); }
+#endif
+
+    uint64_t *buf;                                                                 // objects are stored here
+    int first_index;                                                        // pointing to first object
+    int next_index;                                                         // buf index of next "free" element
+#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+    __uint128_t is_free_mask;                                                  // indicating if this element DOES NOT contain a stored element
+    static_assert(8*sizeof(is_free_mask) >= CSMAG_INDUCTION_VALUE_BUFFER_SIZE, "is_free_mask must have at least CSMAG_BUFFER_SIZE bits, to store the status");
+#endif
+    int object_counter;
+    /*const*/ int buffer_size;
+
+    static RingBufferUInt64 *_singleton;
+};

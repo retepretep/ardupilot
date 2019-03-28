@@ -116,6 +116,15 @@
  # define RANGEFINDER_GLITCH_NUM_SAMPLES  3   // number of rangefinder glitches in a row to take new reading
 #endif
 
+// added by peter {
+//////////////////////////////////////////////////////////////////////////////
+// external magnetometer (CSMAG)
+//
+#ifndef CSMAG_ENABLED
+ # define CSMAG_ENABLED ENABLED
+#endif
+// }
+
 //////////////////////////////////////////////////////////////////////////////
 // Proximity sensor
 //

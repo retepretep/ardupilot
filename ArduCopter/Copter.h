@@ -137,6 +137,14 @@
 #if RANGEFINDER_ENABLED == ENABLED
  # include <AP_RangeFinder/AP_RangeFinder.h>
 #endif
+// added by peter {
+
+#if CSMAG_ENABLED == ENABLED
+ //# include <AP_Csmag/AP_Csmag.h>              // for future implementation 
+ # include <AP_RangeFinder/RangeFinder.h>         // workaround by peter, couldn't compile separate csmag class in csmag.h yet
+#endif
+
+// }
 #if PROXIMITY_ENABLED == ENABLED
  # include <AP_Proximity/AP_Proximity.h>
 #endif
@@ -201,6 +209,11 @@ public:
     void setup() override;
     void loop() override;
 
+    // added by peter 
+#if ISDOVERBOSECSMAGPRINTOUTS
+    int csmagDebugPrintCounter;     // count the number of csmag0 printouts, to prevent from polluting console
+#endif
+
 private:
     static const AP_FWVersion fwver;
 
@@ -238,6 +251,8 @@ private:
     Compass compass;
     AP_InertialSensor ins;
 
+    AP_HAL::UARTDriver *uart_csmag_data;                        // added by peter
+
     RangeFinder rangefinder{serial_manager, ROTATION_PITCH_270};
     struct {
         bool enabled:1;
@@ -247,6 +262,27 @@ private:
         LowPassFilterFloat alt_cm_filt; // altitude filter
         int8_t glitch_count;
     } rangefinder_state = { false, false, 0, 0 };
+
+    //Csmag::CsmagState *csmag_state;    // added by peter
+    // TODO: understand what is happening here. Is it init'ing a Csmag singleton???
+    Csmag csmag{};                      // added by peter  
+
+    CsmagStateBuffer csmag_state_buffer{};  // added by peter
+
+    //RingBuffer<int32_t> induction_value_buffer{(int) CSMAG_INDUCTION_VALUE_BUFFER_SIZE}; // added by peter, doesn't work
+    RingBufferInt32 induction_value_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};              // to buffer induction values from MAGInterface
+    RingBufferUInt64 induction_value_timestamp_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};    // to buffer timestamps assigned to induction values
+
+    // added by peter
+    // uint32_t timestamp_comp_mag;            // comparatative timestamp from MAGInterface
+    // uint64_t timestamp_comp_pix;            // comparatative timestamp from Pixhawk
+    int64_t timestamp_comp_delta;           // Pixhawk time - MAGInterface time
+    bool is_first_csmag_message;
+
+#if ISDOREPEATEDGCSMESSAGE
+    uint64_t time_since_start;
+    uint64_t time_last_repeated_gcs_message;
+#endif
 
 #if RPM_ENABLED == ENABLED
     AP_RPM rpm_sensor;
@@ -678,6 +714,8 @@ private:
     void update_super_simple_bearing(bool force_update);
     void read_AHRS(void);
     void update_altitude();
+    bool init_csmag(void);                      // added by peter, return true if successfull
+    void update_csmag(void);                    // added by peter, called by scheduler
 
     // Attitude.cpp
     float get_pilot_desired_yaw_rate(int16_t stick_angle);
@@ -886,6 +924,9 @@ private:
     void update_visual_odom();
     void winch_init();
     void winch_update();
+
+    void read_csmag(void);                      // added by peter TODO: better name?
+    void check_send_csmag(void);
 
     // setup.cpp
     void report_compass();
