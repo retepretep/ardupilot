@@ -489,3 +489,36 @@ enum LoggingParameters {
 #define THR_BEHAVE_FEEDBACK_FROM_MID_STICK (1<<0)
 #define THR_BEHAVE_HIGH_THROTTLE_CANCELS_LAND (1<<1)
 #define THR_BEHAVE_DISARM_ON_LAND_DETECT (1<<2)
+
+// added by peter {
+// begin of parameters
+#define CSMAG0_INDUCTION_ARRAY_SIZE             10                              // number of magnetic induction values per CSMAG message for CSMAG0
+//#define CSMAG_BUFFER_SIZE                       5                               // number of csmag (csmag_state?) objects that can be stored in buf
+#define CSMAG_BUFFER_SIZE                       2                               // number of csmag (csmag_state?) objects that can be stored in buf
+#define CSMAG_IS_USE_BUFFER_MODE                0                               // buffer csmag data instead of using just 1 csmag state
+#define CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE    1                           // buffer induction values read from serial interface
+#define IS_USE_IS_FREE_MASK_FOR_RINGBUFFER      0                               // sitl can handle __uint128_t, but Pixhawk can't
+#define IS_GENERATE_FAKE_CSMAG_STATE            0                               // generate fake csmag data for each Csmag::CsmagState (N induction values & timestamp)
+#define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES 00                               // generate fake csmag data for each induction value
+#define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES_SIN 1                           // use some sine function as fake induction values
+#define IS_COMPILE_FOR_SITL                     0                               // 0 for real boards, the boards can't handle some commands
+#define MAGNETOMETER_SERIAL_BAUDRATE            115200                          // TODO: read this from some config
+#define IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN    1                               // are values from magnetometer interface big endian?
+#define UART_FOR_CSMAG_DATA                     (hal.uartC)
+#define CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE  (1E6)               // if difference of timestamp_comp_deltas is higher than this: new synch
+// end of parameters
+// normally no need to change values from here 
+
+
+// requires __uint128_t, which is not available on Pixhawk1
+static_assert(!(!IS_COMPILE_FOR_SITL && IS_USE_IS_FREE_MASK_FOR_RINGBUFFER), "cannot use is_free_mask for RingBuffer s on real boards");
+// requires linux/limits.h, which is not available on Pixhawk1
+static_assert(!(!IS_COMPILE_FOR_SITL && ISPRINTMESSAGESINTOFILE), "cannot use ISPRINTMESSAGESINTOFILE on real boards");
+// number of total induction values that can be buffered before they can be sent
+static_assert(!(IS_GENERATE_FAKE_CSMAG_STATE && IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES), 
+    "if fake data is generated, it must be either by induction value, or by CSMAG message");
+#define CSMAG_INDUCTION_VALUE_BUFFER_SIZE       (62 * CSMAG_BUFFER_SIZE)        // max 62 induction values per message // TODO: verify this value
+#define CSMAG_INDUCTION_ARRAY_SIZE              CSMAG0_INDUCTION_ARRAY_SIZE     // number of magnetic induction values per CSMAG message
+#define CSMAG_INVALID_INDUCTION_VALUE           (0x7fffffff)                    // pointing out that it is not a real magnetic induction value
+#define CSMAG_INDUCTION_VALUE_SAMPLE_RATE       50                              // induction values per second, measured & emitted by MAGInterface
+// }

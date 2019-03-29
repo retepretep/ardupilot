@@ -14,14 +14,18 @@ Debug switches added by Peter
 #define ISDOVERBOSEINITPRINTOUTS        00
 #define ISDOBUFFERDEBUGPRINTOUTS        0       // for csmag state buffers
 #define ISMONITORCHECKCSMAG             0       // print info about buffers and whether CSMAG is sent or not
-#define ISUSESLOMOCSMAG                 00       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
+#define ISUSESLOMOCSMAG                 01       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
                                                 // printouts more readable
 #define ISDOVERBOSEUARTCHECK            0       // send repeated message via UARTC (TELEM1 on Pixhawk1)
-#define ISDOMAGDATAREADUARTCHECK        00       // write out some status, if reading from UART worked
-#define ISPRINTTIMESTAMPREADCSMAG       0       // print a timestamp every time Copter::read_csmag() is called
+#define ISDOMAGDATAINITREADUARTCHECK    0       // write out some status, if reading from UART worked at init
+#define ISDOMAGDATAREADUARTCHECK        0       // write out some status, if reading from UART worked
+#define ISPRINTTIMESTAMPREADCSMAG       0      // print a timestamp every time Copter::read_csmag() is called
 
 #define ISDOVERBOSEDEBUGPRINTOUTS       0
 #define ISDOTEMPVERBOSEDEBUG            00       // do debug printouts for the most recent problem (then change it to ISDOVERBOSEDEBUGPRINTOUTS)
+
+#define ISDOUARTDEBUG                   0
+#define ISPRINTOUTNOUARTCONNECTION      0
 
 
 

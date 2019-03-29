@@ -77,6 +77,9 @@ bool Copter::rangefinder_alt_ok()
 // called in Copter::init_ardupilot(...) in system.cpp 
 bool Copter::init_csmag(void) {
 
+    //hal.console->printf("1. HELLO - hal.console->printf ok - 190328T1643+0100\n");
+    //gcs().send_text(MAV_SEVERITY_CRITICAL, "1. HELLO - hal.console->printf ok - 190328T1643+0100");
+
     is_first_csmag_message = true;
 
 #if ISDOREPEATEDGCSMESSAGE
@@ -161,27 +164,38 @@ bool Copter::init_csmag(void) {
     // TODO: properly use serial manager (cf. Rangefinder), doublecheck uart init
     // for now using https://github.com/ArduPilot/ardupilot/blob/master/libraries/AP_HAL/examples/UART_test/UART_test.cpp
 
-    AP_HAL::UARTDriver *uart;
+    AP_HAL::UARTDriver *uart0; // HERE
     // TODO: more elegant UART handling, if necessary?
-    //uart_csmag_data = hal.uartC;            // use UART C (TELEM1 on Pixhawk1) for reading magnetometer data
-    uart_csmag_data = UART_FOR_CSMAG_DATA;
+    uart_csmag_data = hal.uartC;            // use UART C (TELEM1 on Pixhawk1) for reading magnetometer data
+    //uart_csmag_data = UART_FOR_CSMAG_DATA;
 
+    // CONTINUE HERE temporarily change baud rate
     uart_csmag_data->begin(MAGNETOMETER_SERIAL_BAUDRATE);   // TODO: check configuration and baudrate, load it from configurations
+    // uart_csmag_data->begin(57600);
 
-    if (ISDOMAGDATAREADUARTCHECK) {
-        printf("inited UART: %p\n", uart_csmag_data);
-        printf("nullptr: %p\n", nullptr);
+    if (ISDOMAGDATAINITREADUARTCHECK) {
+        hal.console->printf("1. inited UART: %p\n", uart_csmag_data);
+        hal.console->printf("nullptr: %p\n", nullptr);
+    }
+
+    //uart_csmag_data->begin(MAGNETOMETER_SERIAL_BAUDRATE);
+
+    if (ISDOMAGDATAINITREADUARTCHECK) {
+        hal.console->printf("2. inited UART: %p\n", uart_csmag_data);
+        hal.console->printf("nullptr: %p\n", nullptr);
     }
 
     //hal.scheduler->delay(1000); //Ensure that the uartA can be initialized
     if (ISDOVERBOSEUARTCHECK) {
         //AP_HAL::UARTDriver *uart;
         //uart = hal.uartC;
-        uart = uart_csmag_data;
+        uart0 = uart_csmag_data;
         
-        uart->printf("Hello - this is TELEM1!\n");
+        uart0->printf("Hello - this is TELEM1!\n");
         //hal.uartC->printf("Hello - this is TELEM1!\n");
     }
+
+    hal.console->printf("2. HELLO - hal.console->printf ok - 190328T1649+0100\n");
 
    return true;
 }
@@ -203,7 +217,8 @@ void Copter::read_csmag(void) {
     int values_remaining_bytes = 4;
 
     if (ISDOMAGDATAREADUARTCHECK) {
-        printf("UART: %p\n", uart_csmag_data);
+        //printf("UART: %p\n", uart_csmag_data);
+        hal.console->printf("UART: %p\n", uart_csmag_data);         // right now: 0
     }
 
     if (uart_csmag_data != nullptr) {
@@ -270,7 +285,7 @@ void Copter::read_csmag(void) {
                 if (CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
 
                     if (ISDOTEMPVERBOSEDEBUG) {
-                        hal.console->printf("X");
+                        hal.console->printf("R");
                     }
 
                     if (is_timestamp_mode) {
@@ -300,7 +315,12 @@ void Copter::read_csmag(void) {
         }
     } else {
         // TODO: some exception handling
-        hal.console->printf("Error! Can't find UART C.\n");
+        #if ISPRINTOUTNOUARTCONNECTION
+            hal.console->printf("Error! Can't find UART C.\n");
+        #else
+            //printf("X");
+        #endif
+        
     }
 
     if (ISDOMAGDATAREADUARTCHECK) {
@@ -375,6 +395,15 @@ void Copter::read_csmag(void) {
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Hals- und Beinbruch :)");
         time_last_repeated_gcs_message = time_since_start;
 
+        if (ISDOTEMPVERBOSEDEBUG) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "Sending UART test messages on all UART ports");
+            hal.uartA->printf("HELLO UART-A !!!\n");        // only A seems to work rightnow
+            hal.uartB->printf("HELLO UART-B !!!\n");
+            hal.uartC->printf("HELLO UART-C !!!\n");
+            hal.uartD->printf("HELLO UART-D !!!\n");
+            hal.uartE->printf("HELLO UART-E !!!\n");
+        }
+
         if (ISDOVERBOSEUARTCHECK) {
             AP_HAL::UARTDriver *uart;
             int i;
@@ -425,6 +454,7 @@ void Copter::read_csmag(void) {
 
 // checks wether there are enough csmag induction values for a new message and tries to send it
 void Copter::check_send_csmag() {
+
     uint32_t timestamp_comp_mag;            // comparatative timestamp from MAGInterface
     uint64_t timestamp_comp_pix;            // comparatative timestamp from Pixhawk
     int64_t _timestamp_comp_delta;           // Pixhawk time - MAGInterface time

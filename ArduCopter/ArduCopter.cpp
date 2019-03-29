@@ -230,6 +230,7 @@ void Copter::setup()
 
         // print on GCS (SITL console or mission planner)
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Hey ho :) %6.4f", (double)3.1416f);
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "Last change: 20190328T1746+0100");
         // this is a new comment from 190306T1150+0100
     }
 
