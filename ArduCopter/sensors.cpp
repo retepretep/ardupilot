@@ -77,8 +77,8 @@ bool Copter::rangefinder_alt_ok()
 // called in Copter::init_ardupilot(...) in system.cpp 
 bool Copter::init_csmag(void) {
 
-    hal.console->printf("1. HELLO - hal.console->printf ok - 190329T1338+0100\n");
-    gcs().send_text(MAV_SEVERITY_CRITICAL, "1. HELLO - hal.console->printf ok - 190329T1338+0100");
+    // hal.console->printf("1. HELLO - hal.console->printf ok - 190329T1338+0100\n");
+    // gcs().send_text(MAV_SEVERITY_CRITICAL, "1. HELLO - hal.console->printf ok - 190329T1338+0100");
 
     is_first_csmag_message = true;
 
