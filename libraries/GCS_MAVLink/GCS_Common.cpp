@@ -25,13 +25,23 @@
 
 #include "GCS.h"
 
-#include <stdio.h>
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
-#include <drivers/drv_pwm_output.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+// added by peter {
+//#include <AP_Csmag/AP_Csmag.h>
+//#include "../ArduCopter/Copter.h"                  // TEMPORARY workaround, TODO: fix this, using porper AP_Csmag
+#include <AP_RangeFinder/RangeFinder.h>         // temporary workaround for Csmag class
+
+#if ISPRINTMESSAGESINTOFILE
+    #include <stdlib.h>                             //
+    #include <linux/limits.h>                       // for PATH_MAX
+    #include <time.h>                               // for log file time stamp
+    #include <string.h>                             // for memset
 #endif
+#include <stdio.h>
+
+// }
+
+
+
 
 #if HAL_RCINPUT_WITH_AP_RADIO
 #include <AP_Radio/AP_Radio.h>
@@ -76,6 +86,53 @@ GCS_MAVLINK::init(AP_HAL::UARTDriver *port, mavlink_channel_t mav_chan)
     _perf_update = hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, _perf_update_name);
 
     initialised = true;
+
+    // added by peter
+    // workaround to get csmag state from copter to GCS
+    #if ISDOVERBOSECSMAGPRINTOUTS
+        csmagDebugPrintCounter = 0;
+    #endif
+    if (ISDOVERBOSEINITPRINTOUTS) {
+        printf("nullptr: %p\n", nullptr);
+    }
+
+    
+    //if (ISPRINTMESSAGESINTOFILE) {    // throws error b/c of preprocessor-condition declaration of log_fp 
+    #if ISPRINTMESSAGESINTOFILE
+                    //FILE *log_fp; // declared in GCS.h as class variable
+                    //log_fp = fopen("~/git/ardupilot-cs/MyLogs/msgLogs.txt", "w+");
+                    // ~ doesn't work in C's fopen
+                    // get home lib for absolute paths
+                    char *homedir = getenv("HOME");     // in stdlib
+                    if (!homedir) {printf("line %d error.\n", __LINE__); perror("getenv HOME"); exit(EXIT_FAILURE);}
+                    printf("homedir: %s\n", homedir);
+                    char pathbuf[PATH_MAX];
+                    snprintf(pathbuf, sizeof(pathbuf), "%s/git/ardupilot-cs/MyLogs/msgLogs.txt", homedir);
+                    // ~ doesn't work in C
+                    //fp = fopen("~/git/ardupilot-cs/MyLogs/msgLogs.txt", "w");  
+                    printf("pathbuf: %s\n", pathbuf);
+                    // actually open file
+                    log_fp = fopen(pathbuf, "a");  
+                    if (!log_fp) {
+                        printf("line %d error.\n", __LINE__); 
+                        perror("fopen");
+                        exit(EXIT_FAILURE);
+                    } 
+                    printf("line %d ok.\n", __LINE__);
+                    //printf("%2d, ", deferred_message[next].id);
+                    //fprintf(fp, "%2d, ", deferred_message[next].id);
+                    fprintf(log_fp, "called GCS_MAVLINK::init and started log\n");
+                    //fclose(fp);
+                    if (ISPRINTMESSAGESSUMMARY) {
+                        msgCounter = 0;
+                        // init tally list
+                        int i;
+                        for (i = 0; i <= MSG_LAST; i++) {
+                            tally_list[i] = 0;
+                        }
+                    }
+    #endif //ISPRINTMESSAGESINTOFILE
+    //}
 }
 
 
@@ -283,6 +340,11 @@ bool GCS_MAVLINK::send_distance_sensor() const
 
 void GCS_MAVLINK::send_rangefinder_downward() const
 {
+    /*
+    if (ISDODEBUGPRINTOUTS) {
+        printf("r");                // works
+    }*/
+
     RangeFinder *rangefinder = RangeFinder::get_singleton();
     if (rangefinder == nullptr) {
         return;
@@ -295,6 +357,57 @@ void GCS_MAVLINK::send_rangefinder_downward() const
             chan,
             s->distance_cm() * 0.01f,
             s->voltage_mv() * 0.001f);
+}
+
+// added by peter
+// this probably shouldn't be in GCS_Common.cpp
+void GCS_MAVLINK::send_csmag0(void) {
+    Csmag::CsmagState *st;
+
+    if (CSMAG_IS_USE_BUFFER_MODE) {
+        CsmagStateBuffer *csmag_state_buffer = CsmagStateBuffer::get_singleton();
+
+        // check if there is an unsent csmag_state in buffer
+        // if there is no unsent csmag_state, there is nothing to send -> return
+        if (csmag_state_buffer->GetObjectCounter() == 0) {
+            return;
+        }
+
+        st = csmag_state_buffer->pop();
+
+        if (ISDOBUFFERDEBUGPRINTOUTS) {
+            printf("after buffer.pop:\n");
+            csmag_state_buffer->print_info();
+        }
+    } else {
+        Csmag *csmag = Csmag::get_singleton();
+        st = csmag->csmag_state;
+    }
+
+    // TODO: buffer - look for unsent messages in csmag_state buffer and send them
+
+    #if ISDOVERBOSECSMAGPRINTOUTS
+        if (csmagDebugPrintCounter < NUMBEROFCSMAGPRINTOUTS) {
+            printf("line %d ok.\n", __LINE__);
+            printf("(200) GCS_MAVLINK::send_csmag0:\n");
+            printf("(210) st: 0x%" PRIXPTR "\n", (uintptr_t) st);
+            //printf("");
+            //
+            csmagDebugPrintCounter++;
+        }
+    #endif
+
+    mavlink_msg_csmag0_send(
+        chan,
+        st->time_usec,                     
+        st->induction
+        );
+    
+    #if ISDOVERBOSECSMAGPRINTOUTS
+        if (csmagDebugPrintCounter < NUMBEROFCSMAGPRINTOUTS) {
+            printf("line %d ok.\n", __LINE__);
+        }
+    #endif
 }
 
 bool GCS_MAVLINK::send_proximity() const
@@ -2847,6 +2960,8 @@ void GCS_MAVLINK::send_global_position_int()
         ahrs.yaw_sensor);                // compass heading in 1/100 degree
 }
 
+// peter:
+// filter by 'enum ap_message' id and call send_<message>()
 bool GCS_MAVLINK::try_send_message(const enum ap_message id)
 {
     if (telemetry_delayed()) {
@@ -3012,6 +3127,13 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
     case MSG_VIBRATION:
         CHECK_PAYLOAD_SIZE(VIBRATION);
         send_vibration();
+        break;
+
+    // added by peter
+    case MSG_CSMAG0:
+        CHECK_PAYLOAD_SIZE(CSMAG0);
+        send_csmag0();
+        if (ISDOVERBOSECSMAGPRINTOUTS) {printf("c");}      // works :)
         break;
 
     case MSG_ESC_TELEMETRY: {

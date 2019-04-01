@@ -219,6 +219,10 @@ void Copter::init_ardupilot()
     // initialise rangefinder
     init_rangefinder();
 
+    // added by peter
+    // init magnetometer
+    init_csmag();
+
     // init proximity sensor
     init_proximity();
 

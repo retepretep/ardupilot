@@ -14,18 +14,20 @@ Debug switches added by Peter
 #define ISDOVERBOSEINITPRINTOUTS        00
 #define ISDOBUFFERDEBUGPRINTOUTS        0       // for csmag state buffers
 #define ISMONITORCHECKCSMAG             0       // print info about buffers and whether CSMAG is sent or not
-#define ISUSESLOMOCSMAG                 01       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
+#define ISUSESLOMOCSMAG                 00       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
                                                 // printouts more readable
 #define ISDOVERBOSEUARTCHECK            0       // send repeated message via UARTC (TELEM1 on Pixhawk1)
-#define ISDOMAGDATAINITREADUARTCHECK    0       // write out some status, if reading from UART worked at init
+#define ISDOMAGDATAINITREADUARTCHECK    00       // write out some status, if reading from UART worked at init
 #define ISDOMAGDATAREADUARTCHECK        0       // write out some status, if reading from UART worked
 #define ISPRINTTIMESTAMPREADCSMAG       0      // print a timestamp every time Copter::read_csmag() is called
+#define ISDOINTERVALMAGDATAREADUARTCHECK    1   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
 
 #define ISDOVERBOSEDEBUGPRINTOUTS       0
-#define ISDOTEMPVERBOSEDEBUG            00       // do debug printouts for the most recent problem (then change it to ISDOVERBOSEDEBUGPRINTOUTS)
+#define ISDOTEMPVERBOSEDEBUG            0       // do debug printouts for the most recent problem (then change it to ISDOVERBOSEDEBUGPRINTOUTS)
 
 #define ISDOUARTDEBUG                   0
-#define ISPRINTOUTNOUARTCONNECTION      0
+#define ISPRINTOUTNOUARTCONNECTIONVERBOSE       0   // print out full message
+#define ISPRINTOUTNOUARTCONNECTIONSIMPLE        1   // just print out "X"
 
 
 
@@ -46,3 +48,6 @@ Debug switches added by Peter
 #if ISPRINTONGCS
 //#include <GCS_MAVLink/GCS.h> // added by Peter, for printing out messages to GCS, probably not necessary
 #endif
+
+static_assert(!(ISPRINTOUTNOUARTCONNECTIONSIMPLE && ISPRINTOUTNOUARTCONNECTIONVERBOSE), 
+                "cannot have both warning messages for missing uart connection");

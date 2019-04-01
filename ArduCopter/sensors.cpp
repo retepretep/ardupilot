@@ -77,8 +77,8 @@ bool Copter::rangefinder_alt_ok()
 // called in Copter::init_ardupilot(...) in system.cpp 
 bool Copter::init_csmag(void) {
 
-    //hal.console->printf("1. HELLO - hal.console->printf ok - 190328T1643+0100\n");
-    //gcs().send_text(MAV_SEVERITY_CRITICAL, "1. HELLO - hal.console->printf ok - 190328T1643+0100");
+    hal.console->printf("1. HELLO - hal.console->printf ok - 190329T1338+0100\n");
+    gcs().send_text(MAV_SEVERITY_CRITICAL, "1. HELLO - hal.console->printf ok - 190329T1338+0100");
 
     is_first_csmag_message = true;
 
@@ -164,10 +164,12 @@ bool Copter::init_csmag(void) {
     // TODO: properly use serial manager (cf. Rangefinder), doublecheck uart init
     // for now using https://github.com/ArduPilot/ardupilot/blob/master/libraries/AP_HAL/examples/UART_test/UART_test.cpp
 
+#if ISDOVERBOSEUARTCHECK
     AP_HAL::UARTDriver *uart0; // HERE
+#endif
     // TODO: more elegant UART handling, if necessary?
-    uart_csmag_data = hal.uartC;            // use UART C (TELEM1 on Pixhawk1) for reading magnetometer data
-    //uart_csmag_data = UART_FOR_CSMAG_DATA;
+    // uart_csmag_data = hal.uartC;            // use UART C (TELEM1 on Pixhawk1) for reading magnetometer data
+    uart_csmag_data = UART_FOR_CSMAG_DATA;
 
     // CONTINUE HERE temporarily change baud rate
     uart_csmag_data->begin(MAGNETOMETER_SERIAL_BAUDRATE);   // TODO: check configuration and baudrate, load it from configurations
@@ -186,16 +188,16 @@ bool Copter::init_csmag(void) {
     }
 
     //hal.scheduler->delay(1000); //Ensure that the uartA can be initialized
-    if (ISDOVERBOSEUARTCHECK) {
+#if ISDOVERBOSEUARTCHECK
         //AP_HAL::UARTDriver *uart;
         //uart = hal.uartC;
         uart0 = uart_csmag_data;
         
         uart0->printf("Hello - this is TELEM1!\n");
         //hal.uartC->printf("Hello - this is TELEM1!\n");
-    }
+#endif
 
-    hal.console->printf("2. HELLO - hal.console->printf ok - 190328T1649+0100\n");
+    hal.console->printf("2. HELLO - hal.console->printf ok - 190329T1338+0100\n");
 
    return true;
 }
@@ -216,122 +218,8 @@ void Copter::read_csmag(void) {
     bool is_induction_mode;// = false;
     int values_remaining_bytes = 4;
 
-    if (ISDOMAGDATAREADUARTCHECK) {
-        //printf("UART: %p\n", uart_csmag_data);
-        hal.console->printf("UART: %p\n", uart_csmag_data);         // right now: 0
-    }
-
-    if (uart_csmag_data != nullptr) {
-
-        if (ISDOMAGDATAREADUARTCHECK) {
-            printf("read from UART (as hexdump):\n", uart_csmag_data);
-        }
-
-        nbytes = uart_csmag_data->available();
-        is_timestamp_mode = false;
-        is_induction_mode = false;
-        //int values_remaining_bytes = 4;
-        uint8_t c;
-        while (nbytes-- > 0) {
-            //char c = uart_csmag_data->read();
-            c = uart_csmag_data->read();
-
-            if (ISDOMAGDATAREADUARTCHECK) {
-                printf("%02x ", c);
-            }
-
-            if (is_timestamp_mode) {
-                // read uint32_t timestamp
-                if (IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN) {
-                    induction_value_maginterface_timestamp_i <<= 8 * sizeof(c);
-                    induction_value_maginterface_timestamp_i |= c;
-                } else {
-                    // TODO: implement little endian
-                    hal.console->printf("Error! Reading MAGInterface data in little endian is not implemented yet.\n");
-                }
-                values_remaining_bytes--;
-            } else if (is_induction_mode) {
-                // read int32_t induction value
-                if (IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN) {
-                    _induction_value_i <<= 8 * sizeof(c);
-                    _induction_value_i |= c;
-                } else {
-                    // TODO: implement little endian
-                    hal.console->printf("Error! Reading MAGInterface data in little endian is not implemented yet.\n");
-                }
-                values_remaining_bytes--;
-            } else {
-                // default mode: check for state
-                switch (c) {
-                case 'T':
-                    is_timestamp_mode = true;
-                    is_induction_mode = false;
-                    values_remaining_bytes = 4;                     // type uint32_t
-                    induction_value_maginterface_timestamp_i = 0;   // init value
-                    break;
-                case 'I':
-                    is_timestamp_mode = false;
-                    is_induction_mode = true;
-                    values_remaining_bytes = 4;                     // type int32_t
-                    _induction_value_i = 0;
-                    break;
-                }
-            }
-
-            if (values_remaining_bytes <= 0) {
-                // number (timestamp or induction value) has been read
-
-                // push new timestamp or induction value
-                if (CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
-
-                    if (ISDOTEMPVERBOSEDEBUG) {
-                        hal.console->printf("R");
-                    }
-
-                    if (is_timestamp_mode) {
-                        induction_value_timestamp_buffer.enqueue(induction_value_maginterface_timestamp_i);
-                    } else if (is_induction_mode) {
-                        induction_value_buffer.enqueue(_induction_value_i);
-                    } else {
-                        // invalid mode
-                        // should only happen in the beginning
-                        hal.console->printf("Warning! Copter::read_csmag() couldn't read data.\n");
-                    }
-
-                    if (ISMONITORCHECKCSMAG) {
-                        printf("+");
-                        printf("%x", induction_value_buffer.GetObjectCounter());
-                        printf("%x", induction_value_timestamp_buffer.GetObjectCounter());
-                    }
-
-                } else {
-                    printf("WARNING! Please use CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE, using IS_GENERATE_FAKE_CSMAG_STATE is deprecated\n");
-                }
-
-                // go back to default mode after the according number of bytes has been read out
-                is_timestamp_mode = false;
-                is_induction_mode = false;
-            }
-        }
-    } else {
-        // TODO: some exception handling
-        #if ISPRINTOUTNOUARTCONNECTION
-            hal.console->printf("Error! Can't find UART C.\n");
-        #else
-            //printf("X");
-        #endif
-        
-    }
-
-    if (ISDOMAGDATAREADUARTCHECK) {
-        printf("\nEnd of UART data\n");
-    }
-
-    // TODO: convert arduino timestamp to pixhawk timestamp
     //induction_value_timestamp_i = induction_value_maginterface_timestamp_i;
     //induction_value_i = _induction_value_i;
-
-    // using fake data for now
     
     // begin of fake data generation
 
@@ -354,20 +242,172 @@ void Copter::read_csmag(void) {
     }
 
     if (IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES) {
-        //induction_value_timestamp_i = AP_HAL::micros64();
+        // generate and push fake timestamp (works)
+
+        
+        if (ISDOVERBOSEDEBUGPRINTOUTS) {
+            // works
+            hal.console->printf("induction_value_buffer.GetObjectCounter(): %d\n", 
+                induction_value_buffer.GetObjectCounter());
+            hal.console->printf("induction_value_timestamp_buffer.GetObjectCounter(): %d\n", 
+                induction_value_timestamp_buffer.GetObjectCounter());
+            hal.console->printf("---\n");
+        }
+
         induction_value_maginterface_timestamp_i = AP_HAL::micros64();
+        induction_value_timestamp_buffer.enqueue(induction_value_maginterface_timestamp_i);
+
+        // 1 timestamp for <CSMAG_INDUCTION_ARRAY_SIZE> induction values, timestamp first
+        //  WRONG! 1 timestamp for 1 induction value, check_send_csmag takes care of message
+        // if (induction_value_buffer.GetObjectCounter() % CSMAG_INDUCTION_ARRAY_SIZE == 0) {
+        //     if ( (induction_value_buffer.GetObjectCounter() / 10) 
+        //     == (induction_value_timestamp_buffer.GetObjectCounter() - 1) ) {
+        //         induction_value_maginterface_timestamp_i = AP_HAL::micros64();
+        //         induction_value_timestamp_buffer.enqueue(induction_value_maginterface_timestamp_i);
+        //     } else if ( (induction_value_buffer.GetObjectCounter() / 10) 
+        //     == (induction_value_timestamp_buffer.GetObjectCounter() - 1) ) {
+        //         // also ok, in "timestamp_mode" now
+        //     } else {
+        //         hal.console->printf("WARNING!!! Error generating fake data in Pixhawk1\n");
+        //     }
+        // }
+
+        // generate and push fake induction values
+
         if (IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES_SIN) {
-            //induction_value_i = (typeof(induction_value_i)) (100 * sin(induction_value_timestamp_i /  1e6));   
             _induction_value_i = (typeof(_induction_value_i)) (100 * sinf(induction_value_maginterface_timestamp_i /  1e6));   
-            
-            //induction_value_i = (typeof(induction_value_i)) (100 * sin(induction_value_timestamp_i /  1e6 / CSMAG_INDUCTION_ARRAY_SIZE));   
         } else {
-            //induction_value_i = 42;                     // generate constant output of 42
             _induction_value_i = 42;                     // generate constant output of 42
+        }
+        induction_value_buffer.enqueue(_induction_value_i);
+
+        if (ISMONITORCHECKCSMAG) {
+            printf("+");
+            printf("%x", induction_value_buffer.GetObjectCounter());
+            printf("%x", induction_value_timestamp_buffer.GetObjectCounter());
+        }
+
+        if (!CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
+            printf("WARNING! Please use CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE, using IS_GENERATE_FAKE_CSMAG_STATE is deprecated\n");
+        }
+
+        // end of fake data generation
+    } else {
+        // read real values from MAGInterface via UART
+
+        if (ISDOMAGDATAREADUARTCHECK) {
+            //printf("UART: %p\n", uart_csmag_data);
+            hal.console->printf("UART: %p\n", uart_csmag_data);         // right now: 0
+            hal.console->printf("hal.uartC: %p\n", hal.uartC);         // 
+        }
+
+        if (uart_csmag_data != nullptr) {
+
+            if (ISDOMAGDATAREADUARTCHECK) {
+                printf("read from UART (as hexdump):\n", uart_csmag_data);
+            }
+
+            nbytes = uart_csmag_data->available();
+            is_timestamp_mode = false;
+            is_induction_mode = false;
+            //int values_remaining_bytes = 4;
+            uint8_t c;
+            while (nbytes-- > 0) {
+                //char c = uart_csmag_data->read();
+                c = uart_csmag_data->read();
+
+                if (ISDOMAGDATAREADUARTCHECK) {
+                    printf("%02x ", c);
+                }
+
+                if (is_timestamp_mode) {
+                    // read uint32_t timestamp
+                    if (IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN) {
+                        induction_value_maginterface_timestamp_i <<= 8 * sizeof(c);
+                        induction_value_maginterface_timestamp_i |= c;
+                    } else {
+                        // TODO: implement little endian
+                        hal.console->printf("Error! Reading MAGInterface data in little endian is not implemented yet.\n");
+                    }
+                    values_remaining_bytes--;
+                } else if (is_induction_mode) {
+                    // read int32_t induction value
+                    if (IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN) {
+                        _induction_value_i <<= 8 * sizeof(c);
+                        _induction_value_i |= c;
+                    } else {
+                        // TODO: implement little endian
+                        hal.console->printf("Error! Reading MAGInterface data in little endian is not implemented yet.\n");
+                    }
+                    values_remaining_bytes--;
+                } else {
+                    // default mode: check for state
+                    switch (c) {
+                    case 'T':
+                        is_timestamp_mode = true;
+                        is_induction_mode = false;
+                        values_remaining_bytes = 4;                     // type uint32_t
+                        induction_value_maginterface_timestamp_i = 0;   // init value
+                        break;
+                    case 'I':
+                        is_timestamp_mode = false;
+                        is_induction_mode = true;
+                        values_remaining_bytes = 4;                     // type int32_t
+                        _induction_value_i = 0;
+                        break;
+                    }
+                }
+
+                if (values_remaining_bytes <= 0) {
+                    // number (timestamp or induction value) has been read
+
+                    // push new timestamp or induction value
+                    if (CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
+
+                        if (ISDOVERBOSEDEBUGPRINTOUTS) {
+                            hal.console->printf("R");
+                        }
+
+                        if (is_timestamp_mode) {
+                            induction_value_timestamp_buffer.enqueue(induction_value_maginterface_timestamp_i);
+                        } else if (is_induction_mode) {
+                            induction_value_buffer.enqueue(_induction_value_i);
+                        } else {
+                            // invalid mode
+                            // should only happen in the beginning
+                            hal.console->printf("Warning! Copter::read_csmag() couldn't read data.\n");
+                        }
+
+                        if (ISMONITORCHECKCSMAG) {
+                            printf("+");
+                            printf("%x", induction_value_buffer.GetObjectCounter());
+                            printf("%x", induction_value_timestamp_buffer.GetObjectCounter());
+                        }
+
+                    } else {
+                        printf("WARNING! Please use CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE, using IS_GENERATE_FAKE_CSMAG_STATE is deprecated\n");
+                    }
+
+                    // go back to default mode after the according number of bytes has been read out
+                    is_timestamp_mode = false;
+                    is_induction_mode = false;
+                }
+            }
+        } else {
+            // TODO: some exception handling?
+            #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
+                hal.console->printf("Error! Can't find UART C.\n");
+            #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
+                hal.console->printf("X");
+            #endif
+            
+        }
+
+        if (ISDOMAGDATAREADUARTCHECK) {
+            printf("\nEnd of UART data\n");
         }
     }
     
-    // end of fake data generation
 
     // pushing the new status with 50 Hz only makes sense, if we generate fake csmag buffer states
     // normally we'd want to to this only in check_send_csmag
@@ -395,7 +435,16 @@ void Copter::read_csmag(void) {
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Hals- und Beinbruch :)");
         time_last_repeated_gcs_message = time_since_start;
 
-        if (ISDOTEMPVERBOSEDEBUG) {
+        if (ISDOMAGDATAINITREADUARTCHECK) {
+            hal.console->printf("(M10) inited UART: %p\n", uart_csmag_data);
+            hal.console->printf("(M20) nullptr: %p\n", nullptr);
+        }
+
+        if (ISDOINTERVALMAGDATAREADUARTCHECK) {
+            // TODO: continue here
+        }
+
+        if (ISDOVERBOSEDEBUGPRINTOUTS) {
             gcs().send_text(MAV_SEVERITY_CRITICAL, "Sending UART test messages on all UART ports");
             hal.uartA->printf("HELLO UART-A !!!\n");        // only A seems to work rightnow
             hal.uartB->printf("HELLO UART-B !!!\n");
@@ -422,24 +471,34 @@ void Copter::read_csmag(void) {
             for (i = 0; i < repeat_uart_msg; i++) {
                 uart->printf("Hello! ");
             }
+            // hal.console->printf works on mavproxy, using Pixhawk1
+            //  mavproxy.py --map --master=/dev/ttyACM4
+            hal.console->printf("UART B pointer: %p\n", uart);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "UART B pointer: %p", uart);
 
             uart = hal.uartC;
             uart->printf("Hello UARTC!!!\n");
             for (i = 0; i < repeat_uart_msg; i++) {
                 uart->printf("Hello! ");
             }
+            hal.console->printf("UART C pointer: %p\n", uart);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "UART C pointer: %p", uart);
 
             uart = hal.uartD;
             uart->printf("Hello UARTD!!!\n");
             for (i = 0; i < repeat_uart_msg; i++) {
                 uart->printf("Hello! ");
             }
+            hal.console->printf("UART D pointer: %p\n", uart);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "UART D pointer: %p", uart);
 
             uart = hal.uartE;
             uart->printf("Hello UARTE!!!\n");
             for (i = 0; i < repeat_uart_msg; i++) {
                 uart->printf("Hello! ");
             }
+            hal.console->printf("UART E pointer: %p\n", uart);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, "UART E pointer: %p", uart);
             
             // hal.uartC->printf("Hello TELEM1!!!\n");
             // for (i = 0; i < 100; i++) {
