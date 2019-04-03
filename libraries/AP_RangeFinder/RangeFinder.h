@@ -190,19 +190,21 @@ private:
 #include <../ArduCopter/defines.h>  // for array size
 
 // need to add backend (drivers) for CSMAG
+
+
+
 class Csmag {
 public:
-    Csmag();                                    // ctor
+    Csmag();
     // we declare a virtual destructor so that CSMAG (cf. RangeFinder) drivers can
     // override with a custom destructor if need be
-    virtual ~Csmag() {};                    // dtor
+    virtual ~Csmag() {};
     //
     struct CsmagState {
         uint64_t    time_usec;
         int32_t     induction[CSMAG_INDUCTION_ARRAY_SIZE];
-        // TODO: array with fixed size of pointer?
     };
-    //
+    
     //CsmagState *get_state() = { return csmag_state; }
 
     static Csmag *get_singleton(void) { return _singleton; }
@@ -212,6 +214,10 @@ public:
 private:
     static Csmag *_singleton;
 };
+
+
+
+
 
 // TODO: add 2 different buffer size variables (1 config and 1 for the class)
 

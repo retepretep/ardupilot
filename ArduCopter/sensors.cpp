@@ -82,6 +82,10 @@ bool Copter::init_csmag(void) {
 
     is_first_csmag_message = true;
 
+    if (IS_PRINT_WARNING_TIMESTAMPS) {
+        hal.console->printf("init_csmag at AP_HAL::micros == %"PRIu64"\n", AP_HAL::micros64());
+    }
+
 #if ISDOREPEATEDGCSMESSAGE
     // time_since_start = 0;                   // init counter
     // time_last_repeated_gcs_message = 0;
@@ -169,11 +173,19 @@ bool Copter::init_csmag(void) {
 #endif
     // TODO: more elegant UART handling, if necessary?
     // uart_csmag_data = hal.uartC;            // use UART C (TELEM1 on Pixhawk1) for reading magnetometer data
+
+
+
+
     uart_csmag_data = UART_FOR_CSMAG_DATA;
 
-    // CONTINUE HERE temporarily change baud rate
-    uart_csmag_data->begin(MAGNETOMETER_SERIAL_BAUDRATE);   // TODO: check configuration and baudrate, load it from configurations
-    // uart_csmag_data->begin(57600);
+    
+    uart_csmag_data->begin(MAGNETOMETER_SERIAL_BAUDRATE);   
+    
+    
+    
+    // TODO: check configuration and baudrate, load it from configurations
+
 
     if (ISDOMAGDATAINITREADUARTCHECK) {
         hal.console->printf("1. inited UART: %p\n", uart_csmag_data);
@@ -197,7 +209,7 @@ bool Copter::init_csmag(void) {
         //hal.uartC->printf("Hello - this is TELEM1!\n");
 #endif
 
-    hal.console->printf("2. HELLO - hal.console->printf ok - 190329T1338+0100\n");
+    //hal.console->printf("2. HELLO - hal.console->printf ok - 190329T1338+0100\n");
 
    return true;
 }
@@ -375,6 +387,9 @@ void Copter::read_csmag(void) {
                         } else {
                             // invalid mode
                             // should only happen in the beginning
+                            if (IS_PRINT_WARNING_TIMESTAMPS) {
+                                hal.console->printf("At %"PRIu64": ", AP_HAL::micros64());
+                            }
                             hal.console->printf("Warning! Copter::read_csmag() couldn't read data.\n");
                         }
 
@@ -539,6 +554,7 @@ void Copter::check_send_csmag() {
                 // we might check here if the samplerate is correct, before throwing the timestamps away
             }
 
+
             // synchronize timestamps
             //CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE
             // if (is_first_csmag_message) {
@@ -548,7 +564,7 @@ void Copter::check_send_csmag() {
             //     timestamp_comp_mag = _csmag->csmag_state->time_usec;                            // first timestamp of this future message from MAGClient
             //     timestamp_comp_pix = AP_HAL::micros64();
             //     timestamp_comp_delta = timestamp_comp_pix - timestamp_comp_mag;
-            //     is_first_csmag_message = false;
+            //     is_first_csmag_message = false;d
             // }
             timestamp_comp_mag = _csmag->csmag_state->time_usec;                            // first timestamp of this future message from MAGClient
             timestamp_comp_pix = AP_HAL::micros64();

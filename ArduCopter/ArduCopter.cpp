@@ -232,7 +232,7 @@ void Copter::setup()
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Hey ho :) %6.4f", (double)3.1416f);
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "Last change: 20190328T1746+0100");
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "3. Last change: 20190401T1132+0200");
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "3. changed: 20190401T1252+0200");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "3. changed: 20190403T1124+0200");
         // this is a new comment from 190306T1150+0100
     }
 
