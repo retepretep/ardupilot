@@ -505,11 +505,13 @@ enum LoggingParameters {
 #define MAGNETOMETER_SERIAL_BAUDRATE            115200                          // TODO: read this from some config
 #define IS_MAG_INTERFACE_PROTOCOL_BIG_ENDIAN    1                               // are values from magnetometer interface big endian?
 #define IS_PRINT_WARNING_TIMESTAMPS             1                               // 
+#define IS_DO_INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH  1                           // if there are no new induction values for a certain time, delete old values
 
 // UART_FOR_CSMAG_DATA works on TELEM1 on Pixhawk1 and CubeBlack
 //#define UART_FOR_CSMAG_DATA                     (hal.uartC)                   
 #define UART_FOR_CSMAG_DATA                     (hal.uartF)                     // UART F: CONS on CubeBlack
 #define CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE  (1E6)               // if difference of timestamp_comp_deltas is higher than this: new synch
+#define INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH_THRESHOLD      (1E6)               // after which time (us) timeout buffer flush gets triggered?
 // end of parameters
 // normally no need to change values from here 
 

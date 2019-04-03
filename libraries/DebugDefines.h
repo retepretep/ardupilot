@@ -23,7 +23,7 @@ Debug switches added by Peter
 #define ISDOINTERVALMAGDATAREADUARTCHECK    1   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
 
 #define ISDOVERBOSEDEBUGPRINTOUTS       0
-#define ISDOTEMPVERBOSEDEBUG            0       // do debug printouts for the most recent problem (then change it to ISDOVERBOSEDEBUGPRINTOUTS)
+#define ISDOTEMPVERBOSEDEBUG            1       // do debug printouts for the most recent problem (then change it to ISDOVERBOSEDEBUGPRINTOUTS)
 
 #define ISDOUARTDEBUG                   0
 #define ISPRINTOUTNOUARTCONNECTIONVERBOSE       0   // print out full message

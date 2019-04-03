@@ -270,8 +270,12 @@ private:
     CsmagStateBuffer csmag_state_buffer{};  // added by peter
 
     //RingBuffer<int32_t> induction_value_buffer{(int) CSMAG_INDUCTION_VALUE_BUFFER_SIZE}; // added by peter, doesn't work
-    RingBufferInt32 induction_value_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};              // to buffer induction values from MAGInterface
-    RingBufferUInt64 induction_value_timestamp_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};    // to buffer timestamps assigned to induction values
+    // CHANGE HERE
+    // RingBufferInt32 induction_value_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};              // to buffer induction values from MAGInterface
+    // RingBufferUInt64 induction_value_timestamp_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};    // to buffer timestamps assigned to induction values
+    // no singletons necessary:
+    RingBuffer<int32_t> *induction_value_buffer;             // FIXME init with buffer size
+    RingBuffer<uint64_t> *induction_value_timestamp_buffer;  // 
 
     // added by peter
     // uint32_t timestamp_comp_mag;            // comparatative timestamp from MAGInterface

@@ -1057,105 +1057,111 @@ CsmagStateBuffer *CsmagStateBuffer::_singleton;
 
 
 
-// TODO: fix from HERE
+// TODO: test RingBuffer<T> class and put it into another file
+// removed RingBuffer<T> definition to RangeFinder.h, because of 
+//  "undefined reference to RingBuffer<int>"-compile error
+//  see https://bytefreaks.net/programming-2/c/c-undefined-reference-to-templated-class-function
 
-template<typename T>
-RingBuffer<T>::RingBuffer(int _buffer_size) {
-    buffer_size = _buffer_size;
+
+// OLD (deprecated) BEGIN
 // template<typename T>
-// RingBuffer<T>::RingBuffer(const int &_buffer_size) :
-//     buffer_size(_buffer_size) {
+// RingBuffer<T>::RingBuffer(int _buffer_size) {
+//     buffer_size = _buffer_size;
+// // template<typename T>
+// // RingBuffer<T>::RingBuffer(const int &_buffer_size) :
+// //     buffer_size(_buffer_size) {
 
-    buf = new T[buffer_size];                          // should work in C++, even with dynamic variable
+//     buf = new T[buffer_size];                          // should work in C++, even with dynamic variable
     
-    int i;
-    for (i = 0; i < buffer_size; i++) {
-        buf[i] = 0;                                     // TODO: mark as invalid???
-    }
-    object_counter = 0;
-    first_index = INVALID_INDEX;
-    next_index = 0;
-    // set all available buffer slots as free
-#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
-    is_free_mask = (1 << buffer_size) - 1;    // get buffer_size bits, rest is 0 (not free)
-#endif
+//     int i;
+//     for (i = 0; i < buffer_size; i++) {
+//         buf[i] = 0;                                     // TODO: mark as invalid???
+//     }
+//     object_counter = 0;
+//     first_index = INVALID_INDEX;
+//     next_index = 0;
+//     // set all available buffer slots as free
+// #if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+//     is_free_mask = (1 << buffer_size) - 1;    // get buffer_size bits, rest is 0 (not free)
+// #endif
 
-    // ..
+//     // ..
 
-    _singleton = this;
-}
+//     _singleton = this;
+// }
 
-// push object to the end of ring queue buffer
-// return true if pushing went successfully
-template<typename T>
-bool RingBuffer<T>::enqueue(T new_obj) {
-    //bool ret = false;
-    if (is_full()) {
-        // TODO: overwrite first object
-        printf("WARNING! RingBuffer<T> buffer overflow, old objects get overwritten\n");
-        //throw "CsmagStateBuffer buffer overflow";   // throw disabled
-        //return false;
-    }
-    // TODO: perhaps check if it is actually free (in mask)
-    buf[next_index] = new_obj;
-    if (object_counter == 0) {
-        first_index = next_index;   // the new first index, if no object has been stored before
-    }
-#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
-    mark_occupied(next_index);
-#endif
-    //next_index++;
-    next_index = (next_index + 1) % buffer_size;
-    object_counter++;
-    //
-    return true;
-}
+// // push object to the end of ring queue buffer
+// // return true if pushing went successfully
+// template<typename T>
+// bool RingBuffer<T>::enqueue(T new_obj) {
+//     //bool ret = false;
+//     if (is_full()) {
+//         // TODO: overwrite first object
+//         printf("WARNING! RingBuffer<T> buffer overflow, old objects get overwritten\n");
+//         //throw "CsmagStateBuffer buffer overflow";   // throw disabled
+//         //return false;
+//     }
+//     // TODO: perhaps check if it is actually free (in mask)
+//     buf[next_index] = new_obj;
+//     if (object_counter == 0) {
+//         first_index = next_index;   // the new first index, if no object has been stored before
+//     }
+// #if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+//     mark_occupied(next_index);
+// #endif
+//     //next_index++;
+//     next_index = (next_index + 1) % buffer_size;
+//     object_counter++;
+//     //
+//     return true;
+// }
 
-// pop first object at (relative_index 0, counting from first_index with 0)
-template<typename T>
-T RingBuffer<T>::dequeue() {
-    int relative_index = 0;                     
-    int absolute_index = (first_index + relative_index) % buffer_size;
-    // check is there is actually an object
-#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
-    if (is_free(absolute_index)) {
-        //throw "CsmagStateBuffer does not contain an object at the given relative_index";
-        printf("ERROR! RingBuffer does not contain an object at the given relative_index\n");
-    }
-    //
-    mark_free(absolute_index);
-#endif
-    //first_index++;
-    first_index = (first_index + 1) % buffer_size;
-    object_counter--;
-    return buf[absolute_index];
-}
+// // pop first object at (relative_index 0, counting from first_index with 0)
+// template<typename T>
+// T RingBuffer<T>::dequeue() {
+//     int relative_index = 0;                     
+//     int absolute_index = (first_index + relative_index) % buffer_size;
+//     // check is there is actually an object
+// #if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+//     if (is_free(absolute_index)) {
+//         //throw "CsmagStateBuffer does not contain an object at the given relative_index";
+//         printf("ERROR! RingBuffer does not contain an object at the given relative_index\n");
+//     }
+//     //
+//     mark_free(absolute_index);
+// #endif
+//     //first_index++;
+//     first_index = (first_index + 1) % buffer_size;
+//     object_counter--;
+//     return buf[absolute_index];
+// }
 
-// print n as binary digits on console
-template<typename T>
-void RingBuffer<T>::print_bits(uint32_t n) {
-    uint32_t p;
-    for (p = 1 << (8 * sizeof(n) - 1); p > 0; p >>= 1) {
-        printf("%d", (bool) (n & p));
-    }
-}
+// // print n as binary digits on console
+// template<typename T>
+// void RingBuffer<T>::print_bits(uint32_t n) {
+//     uint32_t p;
+//     for (p = 1 << (8 * sizeof(n) - 1); p > 0; p >>= 1) {
+//         printf("%d", (bool) (n & p));
+//     }
+// }
 
-template<typename T>
-void RingBuffer<T>::print_info() {
-    printf("\n");
-    printf("info of RingBuffer object at %p:\n", this);
-    printf("contained objects: %d of max %d\n", object_counter, buffer_size);
-    printf("first_index: %d, next_index: %d\n", first_index, next_index);
-#if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
-    printf("is_free_mask: 0x%x\n", is_free_mask);
-    printf("is_free_mask: 0b"); print_bits(is_free_mask); printf("\n");
-#endif
-    printf("\n");
-}
+// template<typename T>
+// void RingBuffer<T>::print_info() {
+//     printf("\n");
+//     printf("info of RingBuffer object at %p:\n", this);
+//     printf("contained objects: %d of max %d\n", object_counter, buffer_size);
+//     printf("first_index: %d, next_index: %d\n", first_index, next_index);
+// #if IS_USE_IS_FREE_MASK_FOR_RINGBUFFER
+//     printf("is_free_mask: 0x%x\n", is_free_mask);
+//     printf("is_free_mask: 0b"); print_bits(is_free_mask); printf("\n");
+// #endif
+//     printf("\n");
+// }
 
-template<typename T>                                                    // TODO: verify: does this work?
-RingBuffer<T> *RingBuffer<T>::_singleton;
+// template<typename T>                                                    // TODO: verify: does this work?
+// RingBuffer<T> *RingBuffer<T>::_singleton;
 
+// OLD (deprecated) END
 
 
 

@@ -83,7 +83,7 @@ bool Copter::init_csmag(void) {
     is_first_csmag_message = true;
 
     if (IS_PRINT_WARNING_TIMESTAMPS) {
-        hal.console->printf("init_csmag at AP_HAL::micros == %"PRIu64"\n", AP_HAL::micros64());
+        hal.console->printf("init_csmag at AP_HAL::micros == %" PRIu64 "\n", AP_HAL::micros64());
     }
 
 #if ISDOREPEATEDGCSMESSAGE
@@ -149,15 +149,17 @@ bool Copter::init_csmag(void) {
     */
     //RingBuffer<int32_t> *induction_value_buffer = RingBuffer<int32_t>::get_singleton();
 
-    RingBufferInt32 *induction_value_buffer = RingBufferInt32::get_singleton();
+    //RingBufferInt32 *induction_value_buffer = RingBufferInt32::get_singleton();
+    induction_value_buffer = new RingBuffer<int32_t>(CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
 
     if (ISDOBUFFERDEBUGPRINTOUTS || ISDOVERBOSEINITPRINTOUTS) {
         printf("(D10) induction_value_buffer after get_singleton():\n");
         induction_value_buffer->print_info();
     }
     
-    RingBufferUInt64 *induction_value_timestamp_buffer = RingBufferUInt64::get_singleton();
-    
+    //RingBufferUInt64 *induction_value_timestamp_buffer = RingBufferUInt64::get_singleton();
+    // TODO: doublecheck, whether we need 64 or 32 bit values here
+    induction_value_timestamp_buffer = new RingBuffer<uint64_t>(CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
 
     if (ISDOBUFFERDEBUGPRINTOUTS || ISDOVERBOSEINITPRINTOUTS) {
         printf("(E10) induction_value_timestamp_buffer after get_singleton():\n");
@@ -260,14 +262,14 @@ void Copter::read_csmag(void) {
         if (ISDOVERBOSEDEBUGPRINTOUTS) {
             // works
             hal.console->printf("induction_value_buffer.GetObjectCounter(): %d\n", 
-                induction_value_buffer.GetObjectCounter());
+                induction_value_buffer->GetObjectCounter());
             hal.console->printf("induction_value_timestamp_buffer.GetObjectCounter(): %d\n", 
-                induction_value_timestamp_buffer.GetObjectCounter());
+                induction_value_timestamp_buffer->GetObjectCounter());
             hal.console->printf("---\n");
         }
 
         induction_value_maginterface_timestamp_i = AP_HAL::micros64();
-        induction_value_timestamp_buffer.enqueue(induction_value_maginterface_timestamp_i);
+        induction_value_timestamp_buffer->enqueue(induction_value_maginterface_timestamp_i);
 
         // 1 timestamp for <CSMAG_INDUCTION_ARRAY_SIZE> induction values, timestamp first
         //  WRONG! 1 timestamp for 1 induction value, check_send_csmag takes care of message
@@ -291,12 +293,12 @@ void Copter::read_csmag(void) {
         } else {
             _induction_value_i = 42;                     // generate constant output of 42
         }
-        induction_value_buffer.enqueue(_induction_value_i);
+        induction_value_buffer->enqueue(_induction_value_i);
 
         if (ISMONITORCHECKCSMAG) {
             printf("+");
-            printf("%x", induction_value_buffer.GetObjectCounter());
-            printf("%x", induction_value_timestamp_buffer.GetObjectCounter());
+            printf("%x", induction_value_buffer->GetObjectCounter());
+            printf("%x", induction_value_timestamp_buffer->GetObjectCounter());
         }
 
         if (!CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
@@ -380,23 +382,41 @@ void Copter::read_csmag(void) {
                             hal.console->printf("R");
                         }
 
+                        // TODO: check if numbers of timestamps and induction values match
+
                         if (is_timestamp_mode) {
-                            induction_value_timestamp_buffer.enqueue(induction_value_maginterface_timestamp_i);
+                                // use RingBuffer<T> instead of unnecessary RingBuffer singleton classes
+                            // CONTINUE HERE
+                            // if (IS_DO_INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH) {
+                            //     if ((induction_value_maginterface_timestamp_i - induction_value_timestamp_buffer->GetLast())\
+                            //     > INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH_THRESHOLD) {
+                            //         // if last value older than a certain threshold:
+                            //         //  delete all of the old data, because it might be compromised or deprecated
+                            //         while (induction_value_timestamp_buffer.GetObjectCounter() > 0) {
+                            //             induction_value_timestamp_buffer.dequeue();
+                            //         }
+                            //         while (induction_value_buffer.GetObjectCounter() > 0) {
+                            //             induction_value_buffer.dequeue();
+                            //         }
+                            //     }
+                            // }
+
+                            induction_value_timestamp_buffer->enqueue(induction_value_maginterface_timestamp_i);
                         } else if (is_induction_mode) {
-                            induction_value_buffer.enqueue(_induction_value_i);
+                            induction_value_buffer->enqueue(_induction_value_i);
                         } else {
                             // invalid mode
                             // should only happen in the beginning
                             if (IS_PRINT_WARNING_TIMESTAMPS) {
-                                hal.console->printf("At %"PRIu64": ", AP_HAL::micros64());
+                                hal.console->printf("At %" PRIu64 ": ", AP_HAL::micros64());
                             }
                             hal.console->printf("Warning! Copter::read_csmag() couldn't read data.\n");
                         }
 
                         if (ISMONITORCHECKCSMAG) {
                             printf("+");
-                            printf("%x", induction_value_buffer.GetObjectCounter());
-                            printf("%x", induction_value_timestamp_buffer.GetObjectCounter());
+                            printf("%x", induction_value_buffer->GetObjectCounter());
+                            printf("%x", induction_value_timestamp_buffer->GetObjectCounter());
                         }
 
                     } else {
@@ -538,19 +558,19 @@ void Copter::check_send_csmag() {
 
         if (ISMONITORCHECKCSMAG) {
             printf("called Copter::check_send_csmag()\n");
-            printf("induction_value_buffer.GetObjectCounter(): %d\n", induction_value_buffer.GetObjectCounter());
-            printf("induction_value_timestamp_buffer.GetObjectCounter(): %d\n", induction_value_timestamp_buffer.GetObjectCounter());
+            printf("induction_value_buffer.GetObjectCounter(): %d\n", induction_value_buffer->GetObjectCounter());
+            printf("induction_value_timestamp_buffer.GetObjectCounter(): %d\n", induction_value_timestamp_buffer->GetObjectCounter());
         }
 
         // check if there are enough induction values for a new message
-        if (induction_value_buffer.GetObjectCounter() >= CSMAG_INDUCTION_ARRAY_SIZE) {
+        if (induction_value_buffer->GetObjectCounter() >= CSMAG_INDUCTION_ARRAY_SIZE) {
             // if yes: form a message 
             int i;
-            _csmag->csmag_state->time_usec = induction_value_timestamp_buffer.dequeue();    // use timestamp of first induction value
-            _csmag->csmag_state->induction[0] = induction_value_buffer.dequeue();
+            _csmag->csmag_state->time_usec = induction_value_timestamp_buffer->dequeue();    // use timestamp of first induction value
+            _csmag->csmag_state->induction[0] = induction_value_buffer->dequeue();
             for (i = 1; i < CSMAG_INDUCTION_ARRAY_SIZE; i++) {
-                _csmag->csmag_state->induction[i] = induction_value_buffer.dequeue();       // fill induction array with induction values
-                induction_value_timestamp_buffer.dequeue();                                 // throw away other timestamps
+                _csmag->csmag_state->induction[i] = induction_value_buffer->dequeue();       // fill induction array with induction values
+                induction_value_timestamp_buffer->dequeue();                                 // throw away other timestamps
                 // we might check here if the samplerate is correct, before throwing the timestamps away
             }
 
