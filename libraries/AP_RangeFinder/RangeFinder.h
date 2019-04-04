@@ -347,6 +347,8 @@ public:
 #endif
     int GetBufferSize() { return buffer_size; }
 
+    T GetLastObject();                                                      // return object without consuming it
+
     static const int INVALID_INDEX = -1;
 
     //static RingBuffer<T> *get_singleton(void) { return _singleton; }
@@ -405,7 +407,7 @@ RingBuffer<T>::RingBuffer(int _buffer_size) {
     // ..
 
     //_singleton = this;
-    if (ISDOTEMPVERBOSEDEBUG) {
+    if (ISDOVERBOSEDEBUGPRINTOUTS) {
         // hal.console->printf("called RingBuffer init\n"); // "hal is not declared in this scope"
         printf("called RingBuffer init\n");
     }
@@ -477,6 +479,11 @@ void RingBuffer<T>::print_info() {
     printf("is_free_mask: 0b"); print_bits(is_free_mask); printf("\n");
 #endif
     printf("\n");
+}
+
+template<typename T>
+T RingBuffer<T>::GetLastObject() {
+    return buf[(next_index + buffer_size - 1) % buffer_size];       // next points to first free object
 }
 
 // END of RingBuffer<T> definition

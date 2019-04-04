@@ -196,10 +196,10 @@ bool Copter::init_csmag(void) {
 
     //uart_csmag_data->begin(MAGNETOMETER_SERIAL_BAUDRATE);
 
-    if (ISDOMAGDATAINITREADUARTCHECK) {
-        hal.console->printf("2. inited UART: %p\n", uart_csmag_data);
-        hal.console->printf("nullptr: %p\n", nullptr);
-    }
+    // if (ISDOMAGDATAINITREADUARTCHECK) {
+    //     hal.console->printf("2. inited UART: %p\n", uart_csmag_data);
+    //     hal.console->printf("nullptr: %p\n", nullptr);
+    // }
 
     //hal.scheduler->delay(1000); //Ensure that the uartA can be initialized
 #if ISDOVERBOSEUARTCHECK
@@ -224,13 +224,16 @@ void Copter::read_csmag(void) {
 
     Csmag *_csmag;
 
-    uint32_t induction_value_maginterface_timestamp_i = 0;
-    int32_t _induction_value_i = CSMAG_INVALID_INDUCTION_VALUE;
+    // uint32_t induction_value_maginterface_timestamp_i = 0;   // CHANGED HERE
+
+    // TODO: declare as class variables
+    // uint64_t induction_value_maginterface_timestamp_i = 0;
+    // int32_t _induction_value_i = CSMAG_INVALID_INDUCTION_VALUE;
     //uint16_t count;
     int16_t nbytes; // = uart_csmag_data->available();
-    bool is_timestamp_mode;// = false;
-    bool is_induction_mode;// = false;
-    int values_remaining_bytes = 4;
+    // bool is_timestamp_mode;// = false;
+    // bool is_induction_mode;// = false;
+    // int values_remaining_bytes = 4;
 
     //induction_value_timestamp_i = induction_value_maginterface_timestamp_i;
     //induction_value_i = _induction_value_i;
@@ -270,7 +273,6 @@ void Copter::read_csmag(void) {
 
         induction_value_maginterface_timestamp_i = AP_HAL::micros64();
         induction_value_timestamp_buffer->enqueue(induction_value_maginterface_timestamp_i);
-
         // 1 timestamp for <CSMAG_INDUCTION_ARRAY_SIZE> induction values, timestamp first
         //  WRONG! 1 timestamp for 1 induction value, check_send_csmag takes care of message
         // if (induction_value_buffer.GetObjectCounter() % CSMAG_INDUCTION_ARRAY_SIZE == 0) {
@@ -311,7 +313,7 @@ void Copter::read_csmag(void) {
 
         if (ISDOMAGDATAREADUARTCHECK) {
             //printf("UART: %p\n", uart_csmag_data);
-            hal.console->printf("UART: %p\n", uart_csmag_data);         // right now: 0
+            hal.console->printf("UART: %p\n", uart_csmag_data);         // fixed it
             hal.console->printf("hal.uartC: %p\n", hal.uartC);         // 
         }
 
@@ -322,13 +324,14 @@ void Copter::read_csmag(void) {
             }
 
             nbytes = uart_csmag_data->available();
-            is_timestamp_mode = false;
-            is_induction_mode = false;
+            // must preserve modi, dont overwrite mode from last read_csmag() call!
+            // is_timestamp_mode = false;
+            // is_induction_mode = false;
             //int values_remaining_bytes = 4;
             uint8_t c;
             while (nbytes-- > 0) {
                 //char c = uart_csmag_data->read();
-                c = uart_csmag_data->read();
+                c = uart_csmag_data->read();        // TODO: check if read only returns 8 bit
 
                 if (ISDOMAGDATAREADUARTCHECK) {
                     printf("%02x ", c);
@@ -360,15 +363,37 @@ void Copter::read_csmag(void) {
                     case 'T':
                         is_timestamp_mode = true;
                         is_induction_mode = false;
-                        values_remaining_bytes = 4;                     // type uint32_t
-                        induction_value_maginterface_timestamp_i = 0;   // init value
+                        values_remaining_bytes = 4;                     // type uint32_t from MAGInterface, stored as 64 b
+                        induction_value_maginterface_timestamp_i = 0;   // init value TODO: class variable!
+
+                        if (IS_PRINT_MISC_CHAR_UART_BUFFER) {
+                            if (rest_uart_buffer->GetObjectCounter() > 0) {
+                                hal.console->printf("rest_uart_buffer as hex chars: [");
+                                while (rest_uart_buffer->GetObjectCounter() > 0) {
+                                    hal.console->printf("%02x ", rest_uart_buffer->dequeue());
+                                }
+                                hal.console->printf("]\n");
+                            }
+                        }
                         break;
                     case 'I':
                         is_timestamp_mode = false;
                         is_induction_mode = true;
                         values_remaining_bytes = 4;                     // type int32_t
                         _induction_value_i = 0;
+
+                        if (IS_PRINT_MISC_CHAR_UART_BUFFER) {
+                            if (rest_uart_buffer->GetObjectCounter() > 0) {
+                                hal.console->printf("rest_uart_buffer as hex chars: [ ");
+                                while (rest_uart_buffer->GetObjectCounter() > 0) {
+                                    hal.console->printf("%02x ", rest_uart_buffer->dequeue());
+                                }
+                                hal.console->printf("]\n");
+                            }
+                        }
                         break;
+                    default:
+                        rest_uart_buffer->enqueue(c);
                     }
                 }
 
@@ -385,26 +410,62 @@ void Copter::read_csmag(void) {
                         // TODO: check if numbers of timestamps and induction values match
 
                         if (is_timestamp_mode) {
-                                // use RingBuffer<T> instead of unnecessary RingBuffer singleton classes
+                            // use RingBuffer<T> instead of unnecessary RingBuffer singleton classes
                             // CONTINUE HERE
-                            // if (IS_DO_INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH) {
-                            //     if ((induction_value_maginterface_timestamp_i - induction_value_timestamp_buffer->GetLast())\
-                            //     > INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH_THRESHOLD) {
-                            //         // if last value older than a certain threshold:
-                            //         //  delete all of the old data, because it might be compromised or deprecated
-                            //         while (induction_value_timestamp_buffer.GetObjectCounter() > 0) {
-                            //             induction_value_timestamp_buffer.dequeue();
-                            //         }
-                            //         while (induction_value_buffer.GetObjectCounter() > 0) {
-                            //             induction_value_buffer.dequeue();
-                            //         }
-                            //     }
-                            // }
+                            if (IS_DO_INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH) {
+                                
+                                if (ISDOFORMERTEMPVERBOSEDEBUG) {
+                                    hal.console->printf("induction_value_timestamp_buffer->GetLastObject(): %" PRIu64 "\n",
+                                     induction_value_timestamp_buffer->GetLastObject());
+                                }
+
+                                if ( (induction_value_timestamp_buffer->GetObjectCounter() > 0) && 
+                                ( (induction_value_maginterface_timestamp_i - induction_value_timestamp_buffer->GetLastObject())\
+                                > INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH_THRESHOLD ) ) {
+                                    // if last value older than a certain threshold:
+                                    //  delete all of the old data, because it might be compromised or deprecated
+                                    if (ISDOTEMPVERBOSEDEBUG) {
+                                        // hal.console->printf("last timestamp value received via UART is older than threshold.\n");
+                                        hal.console->printf("last timestamp is %" PRIu64 "us old. Deleting old values.\n", 
+                                            induction_value_maginterface_timestamp_i - induction_value_timestamp_buffer->GetLastObject());
+                                        hal.console->printf("induction_value_maginterface_timestamp_i: %" PRIu64 "\n",
+                                            induction_value_maginterface_timestamp_i);
+                                        hal.console->printf("induction_value_timestamp_buffer->GetLastObject(): %" PRIu64 "\n",
+                                            induction_value_timestamp_buffer->GetLastObject());
+                                    }
+
+                                    while (induction_value_timestamp_buffer->GetObjectCounter() > 0) {
+                                        induction_value_timestamp_buffer->dequeue();
+                                    }
+                                    while (induction_value_buffer->GetObjectCounter() > 0) {
+                                        induction_value_buffer->dequeue();
+                                    }
+                                }
+                            }
+
+                            if (ISDOMAGDATAREADUARTCHECK) {
+                                // TODO: printout enqueued data in hex in right alignment (%016x???)
+                                hal.console->printf("enqueue timestamp %" PRIu64 " == 0x%" PRIx64 "\n", 
+                                    induction_value_maginterface_timestamp_i, induction_value_maginterface_timestamp_i);
+                            }
 
                             induction_value_timestamp_buffer->enqueue(induction_value_maginterface_timestamp_i);
                         } else if (is_induction_mode) {
+
+                            if (ISDOMAGDATAREADUARTCHECK) {
+                                hal.console->printf("enqueue induction value %" PRId32 " == 0x%" PRIx32 "\n", 
+                                    _induction_value_i, _induction_value_i);
+                            }
+
                             induction_value_buffer->enqueue(_induction_value_i);
                         } else {
+                            
+                            if (ISDOMAGDATAREADUARTCHECK) {
+                                hal.console->printf("!!! rest of timestamp: %" PRIu64 "\n", 
+                                    induction_value_maginterface_timestamp_i);
+                                hal.console->printf("rest induction value %" PRId32 "\n", _induction_value_i);
+                            }
+
                             // invalid mode
                             // should only happen in the beginning
                             if (IS_PRINT_WARNING_TIMESTAMPS) {
@@ -431,7 +492,7 @@ void Copter::read_csmag(void) {
         } else {
             // TODO: some exception handling?
             #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
-                hal.console->printf("Error! Can't find UART C.\n");
+                hal.console->printf("Error! Can't find UART.");
             #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
                 hal.console->printf("X");
             #endif
@@ -563,7 +624,7 @@ void Copter::check_send_csmag() {
         }
 
         // check if there are enough induction values for a new message
-        if (induction_value_buffer->GetObjectCounter() >= CSMAG_INDUCTION_ARRAY_SIZE) {
+        while (induction_value_buffer->GetObjectCounter() >= CSMAG_INDUCTION_ARRAY_SIZE) {
             // if yes: form a message 
             int i;
             _csmag->csmag_state->time_usec = induction_value_timestamp_buffer->dequeue();    // use timestamp of first induction value
@@ -610,6 +671,14 @@ void Copter::check_send_csmag() {
             if (ISMONITORCHECKCSMAG) {
                 printf("send CSMAG0 message\n");
             }
+
+            // to find out how many messages got sent per check_send_csmag() call (all printed in 1 line)
+            if (ISPRINTOUTSENDCSMAG) {
+                hal.console->printf("CSMAG ");
+            }
+        }
+        if (ISPRINTOUTSENDCSMAG) {
+            hal.console->printf("\n");
         }
     } else {
         printf("Warning! Use CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE! Non buffer mode is deprecated.\n");

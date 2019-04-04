@@ -11,23 +11,26 @@ Debug switches added by Peter
 #define ISDOVERBOSECSMAGPRINTOUTS       0       // print info for every CSMAG0 message sent
 #define ISDOCRAZYDEBUGPRINTOUTS         0       // eg printouts in loops that are called often and will cause performance loss
 #define ISDOABORTS                      0       // execute abort() to verify a particular code is executed
-#define ISDOVERBOSEINITPRINTOUTS        00
+#define ISDOVERBOSEINITPRINTOUTS        0
 #define ISDOBUFFERDEBUGPRINTOUTS        0       // for csmag state buffers
 #define ISMONITORCHECKCSMAG             0       // print info about buffers and whether CSMAG is sent or not
 #define ISUSESLOMOCSMAG                 00       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
                                                 // printouts more readable
 #define ISDOVERBOSEUARTCHECK            0       // send repeated message via UARTC (TELEM1 on Pixhawk1)
-#define ISDOMAGDATAINITREADUARTCHECK    00       // write out some status, if reading from UART worked at init
-#define ISDOMAGDATAREADUARTCHECK        0       // write out some status, if reading from UART worked
+#define ISDOMAGDATAINITREADUARTCHECK    0       // write out some status, if reading from UART worked at init
+#define ISDOMAGDATAREADUARTCHECK        00       // write out some status, if reading from UART worked
 #define ISPRINTTIMESTAMPREADCSMAG       0      // print a timestamp every time Copter::read_csmag() is called
 #define ISDOINTERVALMAGDATAREADUARTCHECK    1   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
 
 #define ISDOVERBOSEDEBUGPRINTOUTS       0
-#define ISDOTEMPVERBOSEDEBUG            1       // do debug printouts for the most recent problem (then change it to ISDOVERBOSEDEBUGPRINTOUTS)
+#define ISDOFORMERTEMPVERBOSEDEBUG      0
+#define ISDOTEMPVERBOSEDEBUG            1       // do debug printouts for the most recent problem (then change it to ISDOFORMERTEMPVERBOSEDEBUG)
 
 #define ISDOUARTDEBUG                   0
-#define ISPRINTOUTNOUARTCONNECTIONVERBOSE       0   // print out full message
-#define ISPRINTOUTNOUARTCONNECTIONSIMPLE        1   // just print out "X"
+#define ISPRINTOUTNOUARTCONNECTIONVERBOSE       1   // print out full message
+#define ISPRINTOUTNOUARTCONNECTIONSIMPLE        0   // just print out "X"
+
+#define ISPRINTOUTSENDCSMAG             0
 
 
 

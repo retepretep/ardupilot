@@ -276,6 +276,16 @@ private:
     // no singletons necessary:
     RingBuffer<int32_t> *induction_value_buffer;             // FIXME init with buffer size
     RingBuffer<uint64_t> *induction_value_timestamp_buffer;  // 
+    // UART reading function must preserve states for next call of read_csmag()
+    uint64_t induction_value_maginterface_timestamp_i = 0;      
+    int32_t _induction_value_i = CSMAG_INVALID_INDUCTION_VALUE;
+    bool is_timestamp_mode = false;
+    bool is_induction_mode = false;
+    int values_remaining_bytes = 0;
+    // for chars read from uart that cannot be assigned to timestamp or induction value
+
+    //#include <AP_RangeFinder>   // TODO: fix class file for ringbuffer
+    RingBuffer<char> *rest_uart_buffer = new RingBuffer<char>(MISC_CHAR_UART_BUFFER_SIZE);
 
     // added by peter
     // uint32_t timestamp_comp_mag;            // comparatative timestamp from MAGInterface
