@@ -331,7 +331,7 @@ void Copter::read_csmag(void) {
             uint8_t c;
             while (nbytes-- > 0) {
                 //char c = uart_csmag_data->read();
-                c = uart_csmag_data->read();        // TODO: check if read only returns 8 bit
+                c = uart_csmag_data->read();        // TODO: check for -1
 
                 if (ISDOMAGDATAREADUARTCHECK) {
                     printf("%02x ", c);

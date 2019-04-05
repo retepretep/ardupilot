@@ -220,7 +220,7 @@ private:
 
 
 // TODO: add 2 different buffer size variables (1 config and 1 for the class)
-
+// TODO: remove CsmagStateBuffer (since this is deprecated)
 // singleton style queue buffer for Csmag::CsmagState type pointers, in order to enable reaching them from within GCS_Mavlink AND Copter class
 class CsmagStateBuffer {
 public:
@@ -487,6 +487,7 @@ T RingBuffer<T>::GetLastObject() {
 }
 
 // END of RingBuffer<T> definition
+
 
 
 /*
