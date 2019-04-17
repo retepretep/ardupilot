@@ -14,17 +14,27 @@ Debug switches added by Peter
 #define ISDOVERBOSEINITPRINTOUTS        0
 #define ISDOBUFFERDEBUGPRINTOUTS        0       // for csmag state buffers
 #define ISMONITORCHECKCSMAG             0       // print info about buffers and whether CSMAG is sent or not
-#define ISUSESLOMOCSMAG                 00       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
+#define ISUSESLOMOCSMAG                 0       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
                                                 // printouts more readable
 #define ISDOVERBOSEUARTCHECK            0       // send repeated message via UARTC (TELEM1 on Pixhawk1)
-#define ISDOMAGDATAINITREADUARTCHECK    0       // write out some status, if reading from UART worked at init
+#define ISDOMAGDATAINITREADUARTCHECK    00       // write out some status, if reading from UART worked at init
+#define ISDOMAGDATAREADUARTPOINTERCHECK 0       // print uart pointers for every read_csmag()
 #define ISDOMAGDATAREADUARTCHECK        00       // write out some status, if reading from UART worked
-#define ISPRINTTIMESTAMPREADCSMAG       0      // print a timestamp every time Copter::read_csmag() is called
-#define ISDOINTERVALMAGDATAREADUARTCHECK    1   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
+#define ISPRINTTIMESTAMPREADCSMAG       00      // print a timestamp every time Copter::read_csmag() is called
+#define ISDOINTERVALMAGDATAREADUARTCHECK    000   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
+#define ISDOCSMAGUPDATEDEBUG            000      // debug printouts for Csmag::update()
+
+#define ISDOPRINTCSMAGMESSAGECONTENT    001       // print the content of CSMAG<N> every time, it's sent
+#define ISDOPRINTREADCSMAGR             00
+
+#define ISDOPRINTCALLCSMAGUPDATE        00
+
+#define ISDOINDUCTIONVALUEBUFFERSIZEPRINTOUT    1   // every Copter::check_send_message() print out size of i v buffer
 
 #define ISDOVERBOSEDEBUGPRINTOUTS       0
 #define ISDOFORMERTEMPVERBOSEDEBUG      0
-#define ISDOTEMPVERBOSEDEBUG            1       // do debug printouts for the most recent problem (then change it to ISDOFORMERTEMPVERBOSEDEBUG)
+#define ISDOTEMPVERBOSEDEBUG            00       // do debug printouts for the most recent problem (then change it to ISDOFORMERTEMPVERBOSEDEBUG)
+#define ISDOMSG_SEND_CSMAGN_PRINTOUT    0
 
 #define ISDOUARTDEBUG                   0
 #define ISPRINTOUTNOUARTCONNECTIONVERBOSE       1   // print out full message

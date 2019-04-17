@@ -80,6 +80,9 @@ enum ap_message : uint8_t {
     MSG_VIBRATION,
     MSG_RPM,
     MSG_CSMAG0,                                 // added manually by peter
+    MSG_CSMAG1,                                 // added manually by peter
+    MSG_CSMAG10,                                // added manually by peter
+    MSG_CSMAG61,                                // added manually by peter
     MSG_MISSION_ITEM_REACHED,
     MSG_POSITION_TARGET_GLOBAL_INT,
     MSG_ADSB_VEHICLE,
@@ -203,8 +206,12 @@ public:
     static void send_collision_all(const AP_Avoidance::Obstacle &threat, MAV_COLLISION_ACTION behaviour);
     void send_accelcal_vehicle_position(uint32_t position);
 
-    // added by peter
-    void send_csmag0();                       // for now in Copter class
+    // added by peter {
+    void send_csmag();                      // for all CSMAG<N> messages
+    // void send_csmag0();
+    // void send_csmag1();
+    // void send_csmag10();
+    // void send_csmag61();
 #if ISDOVERBOSECSMAGPRINTOUTS
     int csmagDebugPrintCounter;             // don't print every message, just NUMBEROFCSMAGPRINTOUTS, to prevent from poulluting console
 #endif
@@ -213,6 +220,7 @@ public:
     int tally_list[MSG_LAST+1];
     int msgCounter;
 #endif
+    // }
 
 
     // return a bitmap of active channels. Used by libraries to loop

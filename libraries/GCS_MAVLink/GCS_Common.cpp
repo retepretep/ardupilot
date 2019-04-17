@@ -359,12 +359,63 @@ void GCS_MAVLINK::send_rangefinder_downward() const
             s->voltage_mv() * 0.001f);
 }
 
+// CONTINUE HERE
+
 // added by peter
-// this probably shouldn't be in GCS_Common.cpp
-void GCS_MAVLINK::send_csmag0(void) {
+// void GCS_MAVLINK::send_csmag0(void) {
+//     Csmag::CsmagState *st;
+
+//     if (CSMAG_IS_USE_BUFFER_MODE) {
+//         CsmagStateBuffer *csmag_state_buffer = CsmagStateBuffer::get_singleton();
+
+//         // check if there is an unsent csmag_state in buffer
+//         // if there is no unsent csmag_state, there is nothing to send -> return
+//         if (csmag_state_buffer->GetObjectCounter() == 0) {
+//             return;
+//         }
+
+//         st = csmag_state_buffer->pop();
+
+//         if (ISDOBUFFERDEBUGPRINTOUTS) {
+//             printf("after buffer.pop:\n");
+//             csmag_state_buffer->print_info();
+//         }
+//     } else {
+//         Csmag *csmag = Csmag::get_singleton();
+//         st = csmag->csmag_state;
+//     }
+
+//     // TODO: buffer - look for unsent messages in csmag_state buffer and send them
+
+//     #if ISDOVERBOSECSMAGPRINTOUTS
+//         if (csmagDebugPrintCounter < NUMBEROFCSMAGPRINTOUTS) {
+//             printf("line %d ok.\n", __LINE__);
+//             printf("(200) GCS_MAVLINK::send_csmag0:\n");
+//             printf("(210) st: 0x%" PRIXPTR "\n", (uintptr_t) st);
+//             //printf("");
+//             //
+//             csmagDebugPrintCounter++;
+//         }
+//     #endif
+
+//     mavlink_msg_csmag0_send(
+//         chan,
+//         st->time_usec,                     
+//         st->induction
+//         );
+    
+//     #if ISDOVERBOSECSMAGPRINTOUTS
+//         if (csmagDebugPrintCounter < NUMBEROFCSMAGPRINTOUTS) {
+//             printf("line %d ok.\n", __LINE__);
+//         }
+//     #endif
+// }
+
+// added by peter
+void GCS_MAVLINK::send_csmag(void) {
     Csmag::CsmagState *st;
 
-    if (CSMAG_IS_USE_BUFFER_MODE) {
+    #if CSMAG_IS_USE_BUFFER_MODE && IS_USE_CSMAGSTATEBUFFER 
         CsmagStateBuffer *csmag_state_buffer = CsmagStateBuffer::get_singleton();
 
         // check if there is an unsent csmag_state in buffer
@@ -379,10 +430,10 @@ void GCS_MAVLINK::send_csmag0(void) {
             printf("after buffer.pop:\n");
             csmag_state_buffer->print_info();
         }
-    } else {
+    #else
         Csmag *csmag = Csmag::get_singleton();
         st = csmag->csmag_state;
-    }
+    #endif
 
     // TODO: buffer - look for unsent messages in csmag_state buffer and send them
 
@@ -397,11 +448,39 @@ void GCS_MAVLINK::send_csmag0(void) {
         }
     #endif
 
-    mavlink_msg_csmag0_send(
-        chan,
-        st->time_usec,                     
-        st->induction
-        );
+    #if (CSMAG_MESSAGE_TYPE == 0)
+        if (ISDOMSG_SEND_CSMAGN_PRINTOUT) { hal.console->printf("calling mavlink_msg_csmag0_send();\n"); }
+        mavlink_msg_csmag0_send(chan,
+            st->time_usec,                     
+            st->induction
+            );
+    #elif (CSMAG_MESSAGE_TYPE == 1)
+        if (ISDOMSG_SEND_CSMAGN_PRINTOUT) { hal.console->printf("calling mavlink_msg_csmag1_send();\n"); }
+        mavlink_msg_csmag1_send(chan,
+            st->time_usec,                     
+            st->induction
+            );
+    #elif (CSMAG_MESSAGE_TYPE == 10)
+        if (ISDOMSG_SEND_CSMAGN_PRINTOUT) { hal.console->printf("calling mavlink_msg_csmag10_send();\n"); }
+        mavlink_msg_csmag10_send(chan,
+            st->time_usec,                     
+            st->induction
+            );
+    #elif (CSMAG_MESSAGE_TYPE == 61)
+        if (ISDOMSG_SEND_CSMAGN_PRINTOUT) { hal.console->printf("calling mavlink_msg_csmag61_send();\n"); }
+        mavlink_msg_csmag61_send(chan,
+            st->time_usec,                     
+            st->induction
+            );
+    #else
+        throw "CSMAG_MESSAGE_TYPE must be either 0, 1, 10 or 61.";
+    #endif
+
+    // mavlink_msg_csmag1_send(
+    //     chan,
+    //     st->time_usec,                     
+    //     st->induction
+    //     );
     
     #if ISDOVERBOSECSMAGPRINTOUTS
         if (csmagDebugPrintCounter < NUMBEROFCSMAGPRINTOUTS) {
@@ -3130,11 +3209,39 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
         break;
 
     // added by peter
-    case MSG_CSMAG0:
-        CHECK_PAYLOAD_SIZE(CSMAG0);
-        send_csmag0();
-        if (ISDOVERBOSECSMAGPRINTOUTS) {printf("c");}      // works :)
-        break;
+    // case MSG_CSMAG0:
+    //     CHECK_PAYLOAD_SIZE(CSMAG0);
+    //     send_csmag();
+    //     if (ISDOVERBOSECSMAGPRINTOUTS) {printf("c");}      // works :)
+    //     break;
+
+    #if (CSMAG_MESSAGE_TYPE == 0)
+        case MSG_CSMAG0:
+            CHECK_PAYLOAD_SIZE(CSMAG0);
+            send_csmag();
+            if (ISDOVERBOSECSMAGPRINTOUTS) {printf("c");}      // works :)
+            break;
+    #elif (CSMAG_MESSAGE_TYPE == 1)
+        case MSG_CSMAG1:
+            CHECK_PAYLOAD_SIZE(CSMAG1);
+            send_csmag();
+            if (ISDOVERBOSECSMAGPRINTOUTS) {printf("c");}      // works :)
+            break;
+    #elif (CSMAG_MESSAGE_TYPE == 10)
+        case MSG_CSMAG10:
+            CHECK_PAYLOAD_SIZE(CSMAG10);
+            send_csmag();
+            if (ISDOVERBOSECSMAGPRINTOUTS) {printf("c");}      // works :)
+            break;
+    #elif (CSMAG_MESSAGE_TYPE == 61)
+        case MSG_CSMAG61:
+            CHECK_PAYLOAD_SIZE(CSMAG61);
+            send_csmag();
+            if (ISDOVERBOSECSMAGPRINTOUTS) {printf("c");}      // works :)
+            break;
+    #else
+        throw "CSMAG_MESSAGE_TYPE must be either 0, 1, 10 or 61.";
+    #endif
 
     case MSG_ESC_TELEMETRY: {
 #ifdef HAVE_AP_BLHELI_SUPPORT

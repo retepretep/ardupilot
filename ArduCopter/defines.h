@@ -492,14 +492,13 @@ enum LoggingParameters {
 
 // added by peter {
 // begin of parameters
-#define CSMAG0_INDUCTION_ARRAY_SIZE             10                              // number of magnetic induction values per CSMAG message for CSMAG0
 //#define CSMAG_BUFFER_SIZE                       5                               // number of csmag (csmag_state?) objects that can be stored in buf
 #define CSMAG_BUFFER_SIZE                       2                               // number of csmag (csmag_state?) objects that can be stored in buf
 #define CSMAG_IS_USE_BUFFER_MODE                0                               // buffer csmag data instead of using just 1 csmag state
 #define CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE    1                           // buffer induction values read from serial interface
 #define IS_USE_IS_FREE_MASK_FOR_RINGBUFFER      0                               // sitl can handle __uint128_t, but Pixhawk can't
 #define IS_GENERATE_FAKE_CSMAG_STATE            0                               // generate fake csmag data for each Csmag::CsmagState (N induction values & timestamp)
-#define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES 00                              // generate fake csmag data for each induction value
+#define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES 000                             // generate fake csmag data for each induction value
 #define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES_SIN 1                           // use some sine function as fake induction values
 #define IS_COMPILE_FOR_SITL                     0                               // 0 for real boards, the boards can't handle some commands
 #define MAGNETOMETER_SERIAL_BAUDRATE            115200                          // TODO: read this from some config
@@ -508,15 +507,36 @@ enum LoggingParameters {
 #define IS_DO_INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH  1                           // if there are no new induction values for a certain time, delete old values
 #define IS_PRINT_MISC_CHAR_UART_BUFFER          1
 
+#define CSMAG_MESSAGE_TYPE                      0                               // 0 for CSMAG0, 62 for CSMAG61, etc.
+
 // UART_FOR_CSMAG_DATA works on TELEM1 on Pixhawk1 and CubeBlack
 //#define UART_FOR_CSMAG_DATA                     (hal.uartC)                   
 #define UART_FOR_CSMAG_DATA                     (hal.uartF)                     // UART F: CONS on CubeBlack
 #define CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE  (1E6)               // if difference of timestamp_comp_deltas is higher than this: new synch
 #define INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH_THRESHOLD      (1E6)               // after which time (us) timeout buffer flush gets triggered?
-#define MISC_CHAR_UART_BUFFER_SIZE              128
+#define MISC_CHAR_UART_BUFFER_SIZE                          128
+
+// for MAGInterface protocol V3.0
+#define MAG_INTERFACE_V30_MESSAGE_SIZE                      16
+#define MAG_INTERFACE_V30_MAGIC_NUMBER1                     (0xC0)              // most significant byte of magic number cola
+#define MAG_INTERFACE_V30_MAGIC_NUMBER0                     (0x1A)              // least significant byte of magic number cola
+#define MAG_INTERFACE_V30_MODE_STANDARD                     0                   // modi are not implemented, reserved for future use
+#define MAG_INTERFACE_SIZE_INDUCTION_VALUE_TIMESTAMP_I      ((int) (sizeof(uint64_t)))
+#define MAG_INTERFACE_SIZE_INDUCTION_VALUE_I                ((int) (sizeof(int32_t)))
+#define MAG_INTERFACE_POS_START_INDUCTION_VALUE_TIMESTAMP_I 3                   // starting at byte 3 of MAGInterface message
+#define MAG_INTERFACE_POS_START_INDUCTION_VALUE_I           11
+
+#define IS_USE_CSMAGSTATEBUFFER                 0                               // CsmagStateBuffers are deprecated!
+#define IS_USE_RINGBUFFER_SINGLETON_CLASSES     0                               // these are deprecated!
+
 // end of parameters
 // normally no need to change values from here 
 
+static_assert((CSMAG_MESSAGE_TYPE == 0 || CSMAG_MESSAGE_TYPE == 1 || CSMAG_MESSAGE_TYPE == 10 || CSMAG_MESSAGE_TYPE == 61),
+    "CSMAG_MESSAGE_TYPE must be either 0, 1, 10 or 61.");
+
+static_assert(!(CSMAG_IS_USE_BUFFER_MODE && !IS_USE_CSMAGSTATEBUFFER),
+    "if CSMAG_IS_USE_BUFFER_MODE is enabled, IS_USE_CSMAGSTATEBUFFER must also be enabled, note that IS_USE_CSMAGSTATEBUFFER is deprecated.");
 
 // requires __uint128_t, which is not available on Pixhawk1
 static_assert(!(!IS_COMPILE_FOR_SITL && IS_USE_IS_FREE_MASK_FOR_RINGBUFFER), "cannot use is_free_mask for RingBuffer s on real boards");
@@ -525,8 +545,25 @@ static_assert(!(!IS_COMPILE_FOR_SITL && ISPRINTMESSAGESINTOFILE), "cannot use IS
 // number of total induction values that can be buffered before they can be sent
 static_assert(!(IS_GENERATE_FAKE_CSMAG_STATE && IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES), 
     "if fake data is generated, it must be either by induction value, or by CSMAG message");
-#define CSMAG_INDUCTION_VALUE_BUFFER_SIZE       (62 * CSMAG_BUFFER_SIZE)        // max 62 induction values per message // TODO: verify this value
-#define CSMAG_INDUCTION_ARRAY_SIZE              CSMAG0_INDUCTION_ARRAY_SIZE     // number of magnetic induction values per CSMAG message
+#define CSMAG0_INDUCTION_ARRAY_SIZE             10                              // number of magnetic induction values per CSMAG message for CSMAG0
+#define CSMAG1_INDUCTION_ARRAY_SIZE              1
+#define CSMAG10_INDUCTION_ARRAY_SIZE            10
+//#define CSMAG62_INDUCTION_ARRAY_SIZE            62
+#define CSMAG61_INDUCTION_ARRAY_SIZE            61
+
+//#define CSMAG_INDUCTION_VALUE_BUFFER_SIZE       (62 * CSMAG_BUFFER_SIZE)        // max 62 induction values per message works
+#define CSMAG_INDUCTION_VALUE_BUFFER_SIZE       (62 * 10)        // max 62 induction values per message // TODO: verify this value
+#if (CSMAG_MESSAGE_TYPE == 0)
+    #define CSMAG_INDUCTION_ARRAY_SIZE              CSMAG0_INDUCTION_ARRAY_SIZE     // number of magnetic induction values per CSMAG message
+#elif (CSMAG_MESSAGE_TYPE == 1)
+    #define CSMAG_INDUCTION_ARRAY_SIZE              CSMAG1_INDUCTION_ARRAY_SIZE     // number of magnetic induction values per CSMAG message
+#elif (CSMAG_MESSAGE_TYPE == 10)
+    #define CSMAG_INDUCTION_ARRAY_SIZE              CSMAG10_INDUCTION_ARRAY_SIZE     // number of magnetic induction values per CSMAG message
+#elif (CSMAG_MESSAGE_TYPE == 61)
+    #define CSMAG_INDUCTION_ARRAY_SIZE              CSMAG61_INDUCTION_ARRAY_SIZE     // number of magnetic induction values per CSMAG message
+#else
+    throw "CSMAG_MESSAGE_TYPE must be either 0, 1, 10 or 62.";
+#endif
 #define CSMAG_INVALID_INDUCTION_VALUE           (0x7fffffff)                    // pointing out that it is not a real magnetic induction value
 #define CSMAG_INDUCTION_VALUE_SAMPLE_RATE       50                              // induction values per second, measured & emitted by MAGInterface
 // }

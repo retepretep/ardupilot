@@ -940,9 +940,16 @@ Csmag::Csmag() {
     csmag_state = new CsmagState();
     csmag_state->time_usec = 0;
     int i;
-    for (i = 0; i < CSMAG0_INDUCTION_ARRAY_SIZE; i++) {
+    for (i = 0; i < CSMAG_INDUCTION_ARRAY_SIZE; i++) {
         csmag_state->induction[i] = CSMAG_INVALID_INDUCTION_VALUE;
     }
+
+    // initing buffers here or in Copter::init_csmag() ?
+    induction_value_buffer = new RingBuffer<int32_t>(CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+    induction_value_timestamp_buffer = new RingBuffer<uint64_t>(CSMAG_INDUCTION_VALUE_BUFFER_SIZE);
+
+    uart = UART_FOR_CSMAG_DATA;
+
     _singleton = this;
 
     // if (ISDOVERBOSEINITPRINTOUTS) {
@@ -953,7 +960,313 @@ Csmag::Csmag() {
 Csmag *Csmag::_singleton;
 
 
+//bool Csmag::update(void) {
+int Csmag::update(void) {    
+    int counter_read_data = 0;
+    uint64_t induction_value_timestamp_i = 0;
+    int32_t induction_value_i = CSMAG_INVALID_INDUCTION_VALUE;
+    int16_t nbytes_i = -1;
+    // int n_uart_bytes_left = -1;
+    bool is_successfully_read_data = false;
 
+    // is_successfully_read_data = Csmag::get_reading(induction_value_timestamp_i, induction_value_i);
+    // // TODO: while? and parse MAG data in UART buffer line by line? (FIFO?)
+    // if (is_successfully_read_data) {
+    //     // checking data probably not necessary here
+    //     induction_value_timestamp_buffer->enqueue(induction_value_timestamp_i);
+    //     induction_value_buffer->enqueue(induction_value_i);
+    // }
+
+    // while (is_successfully_read_data = Csmag::get_reading(induction_value_timestamp_i, induction_value_i)) {
+    //     induction_value_timestamp_buffer->enqueue(induction_value_timestamp_i);
+    //     induction_value_buffer->enqueue(induction_value_i);
+    // }
+
+    if (ISDOCSMAGUPDATEDEBUG) {
+        hal.console->printf("(Up 10) call Csmag::update()\n");
+    }
+    
+    // variante using the weird for loop, might have another behaviour than expected, but more compact
+
+    // read mag values from uart, as long as there is data in Pixhawk's UART buffer
+    // for (n_uart_bytes_left = Csmag::get_reading(induction_value_timestamp_i, induction_value_i);
+    //         n_uart_bytes_left > 0;
+    //         n_uart_bytes_left = Csmag::get_reading(induction_value_timestamp_i, induction_value_i)
+    // ) {
+    //     if (ISDOCSMAGUPDATEDEBUG) {
+    //         hal.console->printf("read, ");
+    //     }
+    //     induction_value_timestamp_buffer->enqueue(induction_value_timestamp_i);
+    //     induction_value_buffer->enqueue(induction_value_i);
+    //     is_successfully_read_data = true;
+    // }
+
+    // read mag values from uart, as long as there is data in Pixhawk's UART buffer
+    // TODO: CONTINUE HERE
+
+    for (is_successfully_read_data = Csmag::get_reading(induction_value_timestamp_i, induction_value_i, nbytes_i);
+            //n_uart_bytes_left > 0; // old
+            //n_uart_bytes_left >= MAG_INTERFACE_V30_MESSAGE_SIZE;
+            is_successfully_read_data || (nbytes_i > 0);
+            is_successfully_read_data = Csmag::get_reading(induction_value_timestamp_i, induction_value_i, nbytes_i)
+    ) {
+        if (ISDOCSMAGUPDATEDEBUG || ISDOTEMPVERBOSEDEBUG) {
+            hal.console->printf("read, ");
+        }
+
+        if (is_successfully_read_data) {
+            #if ISDOTEMPVERBOSEDEBUG 
+                hal.console->printf("induction_value_timestamp_buffer->enqueue(%" PRIu64 ");\n", induction_value_timestamp_i);
+                hal.console->printf("induction_value_buffer->enqueue(%" PRId32 ");\n", induction_value_i);
+            #endif
+
+            induction_value_timestamp_buffer->enqueue(induction_value_timestamp_i);
+            induction_value_buffer->enqueue(induction_value_i);
+            counter_read_data++;
+        }        
+    }
+
+    // variante: clearer and less compact
+
+    // n_uart_bytes_left = Csmag::get_reading(induction_value_timestamp_i, induction_value_i);
+    // while (n_uart_bytes_left > 0) {
+    //     if (ISDOCSMAGUPDATEDEBUG) {
+    //         hal.console->printf("read, ");
+    //     }
+    //     induction_value_timestamp_buffer->enqueue(induction_value_timestamp_i);
+    //     induction_value_buffer->enqueue(induction_value_i);
+    //     is_successfully_read_data = true;
+    //     //
+    //     n_uart_bytes_left = Csmag::get_reading(induction_value_timestamp_i, induction_value_i);
+    // }
+
+    // 
+
+    if (ISDOCSMAGUPDATEDEBUG) {
+        hal.console->printf("(Up 20) \n----\n");
+    }
+
+    // old return value of get_reading
+    // while (is_successfully_read_data = Csmag::get_reading(induction_value_timestamp_i, induction_value_i)) {
+    //     induction_value_timestamp_buffer->enqueue(induction_value_timestamp_i);
+    //     induction_value_buffer->enqueue(induction_value_i);
+    // }
+    // perhaps some status update here, unnecessary for now
+    return counter_read_data;
+}
+
+bool Csmag::get_reading(uint64_t &induction_timestamp_i, int32_t &induction_value_i, int16_t &nbytes) {
+// int Csmag::get_reading(uint64_t &induction_timestamp_i, int32_t &induction_value_i) {
+
+    bool is_successfully_read_data = false;
+
+    if (uart == nullptr) {
+        #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
+            hal.console->printf("Error! Can't find UART.\n");
+        #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
+            hal.console->printf("X");
+        #endif
+
+        return false;
+        // return 0;   // no uart ==> no data available
+    }
+    
+    // old variables from benewake
+    // float sum_cm = 0;
+    // uint16_t count = 0;
+    // uint16_t count_out_of_range = 0;
+
+    if (ISDOMAGDATAREADUARTCHECK) {
+        hal.console->printf("(U005) read from UART %p (as hexdump):\n", uart);
+    }
+
+    // read any available lines from the lidar
+    //int16_t nbytes = uart->available();
+    nbytes = uart->available();
+    while (nbytes-- > 0) {
+        int16_t r = uart->read();       // try to read 1 byte from UART
+
+        if (ISDOMAGDATAREADUARTCHECK) {
+            if (r == -1) {
+                hal.console->printf("(-1) ==> no available data at UART!\n");
+            }
+        }
+
+        if (r < 0) {                    // read() returned (int16_t) -1 ==> nothing available
+            continue;
+        }
+
+        uint8_t c = (uint8_t)r;         // otherwise read() returned uint8_t data byte
+
+        if (ISDOMAGDATAREADUARTCHECK) {
+            hal.console->printf("0x%02x ", c);
+        }
+
+        if (ISDOTEMPVERBOSEDEBUG) {
+            hal.console->printf(" (U007) linebuf_len: %d\n", linebuf_len);
+        }
+
+        // if buffer is empty and this byte is <magic number>, add to buffer
+        if (linebuf_len == 0) {
+            if (ISDOTEMPVERBOSEDEBUG) {
+                hal.console->printf("(U010) interpreting byte from UART: 0x%02x\n", c);
+            }
+
+            if (c == MAG_INTERFACE_V30_MAGIC_NUMBER1) {
+                if (ISDOTEMPVERBOSEDEBUG) {
+                    hal.console->printf("(U015) matches magic number1\n");
+                }
+                linebuf[linebuf_len++] = c;
+            } else {
+                // TODO: invalid MAGInterface message! clear buffer and return false here?
+                // incorrect data
+                #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
+                    hal.console->printf("Error!!! Cannot interpret MAGInterface data. linebuf_len: %d\n", 
+                        (int) linebuf_len);
+                #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
+                    hal.console->printf("?");
+                #endif
+
+                if (ISDOTEMPVERBOSEDEBUG) {
+                    //hal.console->printf("(U030) interpreting byte from UART: 0x%02x\n", c);
+
+                }
+            }
+        // } else if (linebuf_len == 1) {
+        //     // if buffer has 1 element and this byte is 0x59, add it to buffer
+        //     // if not clear the buffer
+        //     // TODO:find out why this happens???
+        //     if (c == MAG_INTERFACE_V30_MAGIC_NUMBER1) {
+        //         linebuf[linebuf_len++] = c;
+        //     } else {
+        //         linebuf_len = 0;
+        //     }
+        } else if (linebuf_len == 1) {
+            if (ISDOTEMPVERBOSEDEBUG) {
+                hal.console->printf("(U020) interpreting byte from UART: 0x%02x\n", c);
+            }
+
+            if (c == MAG_INTERFACE_V30_MAGIC_NUMBER0) {
+                linebuf[linebuf_len++] = c;
+            } else {
+                // incorrect data
+                #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
+                    hal.console->printf("Error!!! Cannot interpret MAGInterface data. linebuf_len: %d\n", 
+                        (int) linebuf_len);
+                #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
+                    hal.console->printf("?");
+                #endif
+
+                // TODO: invalid MAGInterface message! clear buffer and return false here?
+                if (ISDOTEMPVERBOSEDEBUG) {
+                    hal.console->printf("(U030) Reset linebuf_len, return\n");
+                }
+                linebuf_len = 0;
+                // return nbytes;
+                return is_successfully_read_data;
+            }
+        } else {
+            // add character to buffer
+            linebuf[linebuf_len++] = c;
+
+            if (ISDOTEMPVERBOSEDEBUG) {
+                hal.console->printf("(U040) add char to linebuf from UART: 0x%02x\n", c);
+            }
+
+            // if buffer now has a full MAGInterface message: try to decode it
+            if (linebuf_len == MAG_INTERFACE_V30_MESSAGE_SIZE) {
+
+                if (ISDOTEMPVERBOSEDEBUG) {
+                    //hal.console->printf("(U050) linebuf full, interpreting last byte from UART: 0x%02x\n", c);
+                    hal.console->printf("(U050) linebuf full\n");
+                    hal.console->printf("(U060) checking checksum\n");
+                }
+
+                // calculate checksum
+                uint8_t checksum = 0;
+                // exclude transmitted checksum from checksum calculation
+                for (uint8_t i=0; i < (MAG_INTERFACE_V30_MESSAGE_SIZE - 1); i++) {    
+                    checksum += linebuf[i];
+                }
+                // if checksum matches extract contents
+                if (checksum == linebuf[MAG_INTERFACE_V30_MESSAGE_SIZE - 1]) {
+
+                    if (ISDOTEMPVERBOSEDEBUG) {
+                        hal.console->printf("(U070) checksums match. checksum: %d\n", checksum);
+                    }
+
+                    int i;
+                    // read timestamp
+                    induction_timestamp_i = 0;
+                    for (i = 0; i < MAG_INTERFACE_SIZE_INDUCTION_VALUE_TIMESTAMP_I; i++) {
+                        induction_timestamp_i |= (uint64_t) linebuf[\
+                        MAG_INTERFACE_POS_START_INDUCTION_VALUE_TIMESTAMP_I\
+                         + (MAG_INTERFACE_SIZE_INDUCTION_VALUE_TIMESTAMP_I - 1 - i)] << (8 * i);
+                    }   // hopefully compiler uses loopunrolling here
+                    // TODO: perhaps count out of range? for now we won't handle it here, but on GCS
+                    // mag values outside of range are possible due to low pass filter
+                    // uint16_t dist = ((uint16_t)linebuf[3] << 8) | linebuf[2];
+
+                    // read induction values
+                    induction_value_i = 0;
+                    for (i = 0; i < MAG_INTERFACE_SIZE_INDUCTION_VALUE_I; i++) {
+                        induction_value_i |= (int32_t) linebuf[\
+                        MAG_INTERFACE_POS_START_INDUCTION_VALUE_I\
+                         + (MAG_INTERFACE_SIZE_INDUCTION_VALUE_I - 1 - i)] << (8 * i);
+                    }
+                    is_successfully_read_data = true;
+                    // only read 1 line/MAGinterface message for each function call of get_reading()
+                    // return is_successfully_read_data;
+                    if (ISDOTEMPVERBOSEDEBUG) {
+                        hal.console->printf("(U080) return, nbytes: %d, is_successfully_read_data: %d\n",
+                            nbytes, is_successfully_read_data);
+                    }       
+                    // added clear buffer to prevent from buffer overflow 
+                    // clear buffer
+                    linebuf_len = 0;
+
+                    // return nbytes;
+                    return is_successfully_read_data;
+                } else {
+                    // incorrect checksum
+                    #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
+                        hal.console->printf("Error!!! Incorrect checksum for MAGinterface data.\n");
+                    #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
+                        hal.console->printf("C");
+                    #endif
+                }
+                // clear buffer
+                linebuf_len = 0;
+            }
+        }
+    }
+
+    if (ISDOMAGDATAREADUARTCHECK) {
+        hal.console->printf("\n(U200) nbytes: %d\n--\n", (int) nbytes);
+    }
+
+    // if (count > 0) {
+    //     // return average distance of readings
+    //     reading_cm = sum_cm / count;
+    //     return true;
+    // }
+
+    // if (count_out_of_range > 0) {
+    //     // if only out of range readings return larger of
+    //     // driver defined maximum range for the model and user defined max range + 1m
+    //     float model_dist_max_cm = (model_type == BENEWAKE_TFmini) ? BENEWAKE_TFMINI_OUT_OF_RANGE_CM : BENEWAKE_TF02_OUT_OF_RANGE_CM;
+    //     reading_cm = MAX(model_dist_max_cm, max_distance_cm() + BENEWAKE_OUT_OF_RANGE_ADD_CM);
+    //     return true;
+    // }
+
+    // no readings so return false
+    return is_successfully_read_data;
+    // return nbytes;
+}
+
+
+
+#if IS_USE_CSMAGSTATEBUFFER
 
 CsmagStateBuffer::CsmagStateBuffer() {
 
@@ -1054,7 +1367,7 @@ void CsmagStateBuffer::print_info() {
 
 CsmagStateBuffer *CsmagStateBuffer::_singleton;
 
-
+#endif
 
 
 // TODO: test RingBuffer<T> class and put it into another file
@@ -1163,7 +1476,7 @@ CsmagStateBuffer *CsmagStateBuffer::_singleton;
 
 // OLD (deprecated) END
 
-
+#if IS_USE_RINGBUFFER_SINGLETON_CLASSES
 
 // since there seems to be some problem with RingBuffer using templates, let's try fixed data type int32_t for induction values:
 
@@ -1357,3 +1670,5 @@ void RingBufferUInt64::print_info() {
 }
 
 RingBufferUInt64 *RingBufferUInt64::_singleton;
+
+#endif 

@@ -251,7 +251,7 @@ private:
     Compass compass;
     AP_InertialSensor ins;
 
-    AP_HAL::UARTDriver *uart_csmag_data;                        // added by peter
+    // AP_HAL::UARTDriver *uart_csmag_data;                        // added by peter
 
     RangeFinder rangefinder{serial_manager, ROTATION_PITCH_270};
     struct {
@@ -265,20 +265,23 @@ private:
 
     //Csmag::CsmagState *csmag_state;    // added by peter
     // TODO: understand what is happening here. Is it init'ing a Csmag singleton???
+    
     Csmag csmag{};                      // added by peter  
 
+    #if IS_USE_CSMAGSTATEBUFFER
     CsmagStateBuffer csmag_state_buffer{};  // added by peter
+    #endif
 
     //RingBuffer<int32_t> induction_value_buffer{(int) CSMAG_INDUCTION_VALUE_BUFFER_SIZE}; // added by peter, doesn't work
     // CHANGE HERE
     // RingBufferInt32 induction_value_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};              // to buffer induction values from MAGInterface
     // RingBufferUInt64 induction_value_timestamp_buffer{CSMAG_INDUCTION_VALUE_BUFFER_SIZE};    // to buffer timestamps assigned to induction values
     // no singletons necessary:
-    RingBuffer<int32_t> *induction_value_buffer;             // FIXME init with buffer size
-    RingBuffer<uint64_t> *induction_value_timestamp_buffer;  // 
+    // RingBuffer<int32_t> *induction_value_buffer;             // FIXME init with buffer size
+    // RingBuffer<uint64_t> *induction_value_timestamp_buffer;  // 
     // UART reading function must preserve states for next call of read_csmag()
-    uint64_t induction_value_maginterface_timestamp_i = 0;      
-    int32_t _induction_value_i = CSMAG_INVALID_INDUCTION_VALUE;
+    // uint64_t induction_value_maginterface_timestamp_i = 0;      
+    // int32_t _induction_value_i = CSMAG_INVALID_INDUCTION_VALUE;
     bool is_timestamp_mode = false;
     bool is_induction_mode = false;
     int values_remaining_bytes = 0;
@@ -292,6 +295,10 @@ private:
     // uint64_t timestamp_comp_pix;            // comparatative timestamp from Pixhawk
     int64_t timestamp_comp_delta;           // Pixhawk time - MAGInterface time
     bool is_first_csmag_message;
+
+#if ISPRINTTIMESTAMPREADCSMAG
+    int call_read_counter = 0;
+#endif
 
 #if ISDOREPEATEDGCSMESSAGE
     uint64_t time_since_start;

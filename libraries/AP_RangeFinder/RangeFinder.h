@@ -191,7 +191,7 @@ private:
 
 // need to add backend (drivers) for CSMAG
 
-
+template<typename T> class RingBuffer;      // forward declaration for use in Csmag
 
 class Csmag {
 public:
@@ -199,11 +199,18 @@ public:
     // we declare a virtual destructor so that CSMAG (cf. RangeFinder) drivers can
     // override with a custom destructor if need be
     virtual ~Csmag() {};
-    //
+
+    // state for MAVLink message CSMAG to be sent
+    // TODO: different name? (CsmagMessageState???)
     struct CsmagState {
         uint64_t    time_usec;
         int32_t     induction[CSMAG_INDUCTION_ARRAY_SIZE];
     };
+
+    // update status and try to read data from MAGInterface
+    // return true, if a value has been read successfully from MAGInterface
+    //bool update(void);   // TODO
+    int update(void);   // return number of induction values read from MAG Interface
     
     //CsmagState *get_state() = { return csmag_state; }
 
@@ -211,13 +218,31 @@ public:
 
     CsmagState *csmag_state;
 
+    RingBuffer<int32_t> *induction_value_buffer;             // FIXME init with buffer size
+    RingBuffer<uint64_t> *induction_value_timestamp_buffer;  //
+
+    AP_HAL::UARTDriver *GetUART(void) { return uart; }
+
 private:
     static Csmag *_singleton;
+    
+    // read last (timestamp, induction) tuple
+    // // return true, if values have been read successfully
+    // bool get_reading(uint64_t &induction_timestamp_i, int32_t &induction_value_i);
+    // return number of available bytes left in UART buffer,
+    // 0 ==> no data left to process,
+    // n ==> still data left to process (n > 0)
+    bool get_reading(uint64_t &induction_timestamp_i, int32_t &induction_value_i, int16_t &nbytes);
+
+    // int get_reading(uint64_t &induction_timestamp_i, int32_t &induction_value_i);
+    AP_HAL::UARTDriver *uart = nullptr;
+    uint8_t linebuf[MAG_INTERFACE_V30_MESSAGE_SIZE + 1];    // 1 extra space to detect faulty behaviour
+    uint8_t linebuf_len = 0;
 };
 
 
 
-
+#if IS_USE_CSMAGSTATEBUFFER
 
 // TODO: add 2 different buffer size variables (1 config and 1 for the class)
 // TODO: remove CsmagStateBuffer (since this is deprecated)
@@ -257,6 +282,8 @@ private:
 
     static CsmagStateBuffer *_singleton;
 };
+
+#endif
 
 
 // template<typename T>
@@ -488,7 +515,7 @@ T RingBuffer<T>::GetLastObject() {
 
 // END of RingBuffer<T> definition
 
-
+#if IS_USE_RINGBUFFER_SINGLETON_CLASSES
 
 /*
 class RingBufferInt32 : public RingBuffer<int32_t> {
@@ -617,3 +644,5 @@ private:
 
     static RingBufferUInt64 *_singleton;
 };
+
+#endif 
