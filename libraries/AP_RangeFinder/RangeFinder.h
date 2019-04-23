@@ -208,9 +208,8 @@ public:
     };
 
     // update status and try to read data from MAGInterface
-    // return true, if a value has been read successfully from MAGInterface
-    //bool update(void);   // TODO
     int update(void);   // return number of induction values read from MAG Interface
+    void synch_timestamp(uint64_t timestamp);
     
     //CsmagState *get_state() = { return csmag_state; }
 
@@ -221,15 +220,16 @@ public:
     RingBuffer<int32_t> *induction_value_buffer;             // FIXME init with buffer size
     RingBuffer<uint64_t> *induction_value_timestamp_buffer;  //
 
+    //uint64_t timestamp_last_synch = ~0;
+    uint64_t timestamp_last_synch = 0;
+
     AP_HAL::UARTDriver *GetUART(void) { return uart; }
 
 private:
     static Csmag *_singleton;
     
-    // read last (timestamp, induction) tuple
-    // // return true, if values have been read successfully
-    // bool get_reading(uint64_t &induction_timestamp_i, int32_t &induction_value_i);
-    // return number of available bytes left in UART buffer,
+    // return bool, if values have been read from UART successfully
+    // nbytes: number of available bytes left in UART buffer,    
     // 0 ==> no data left to process,
     // n ==> still data left to process (n > 0)
     bool get_reading(uint64_t &induction_timestamp_i, int32_t &induction_value_i, int16_t &nbytes);
@@ -447,7 +447,8 @@ bool RingBuffer<T>::enqueue(T new_obj) {
     //bool ret = false;
     if (is_full()) {
         // TODO: overwrite first object
-        printf("WARNING! RingBuffer<T> buffer overflow, old objects get overwritten\n");
+        printf("WARNING! RingBuffer<T> buffer overflow, old objects get overwritten, ");
+        printf("buffer_size: %d\n", this->buffer_size);
         //throw "CsmagStateBuffer buffer overflow";   // throw disabled
         //return false;
     }

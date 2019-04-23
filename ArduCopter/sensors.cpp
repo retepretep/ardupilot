@@ -803,11 +803,33 @@ void Copter::read_csmag(void) {
 // checks wether there are enough csmag induction values for a new message and tries to send it
 void Copter::check_send_csmag() {
 
-    uint32_t timestamp_comp_mag;            // comparatative timestamp from MAGInterface
+    // uint32_t timestamp_comp_mag;            // comparatative timestamp from MAGInterface
     uint64_t timestamp_comp_pix;            // comparatative timestamp from Pixhawk
-    int64_t _timestamp_comp_delta;           // Pixhawk time - MAGInterface time
+    // int64_t _timestamp_comp_delta;           // Pixhawk time - MAGInterface time
+    
     //Csmag *_csmag = new Csmag();    // TODO: remove this
     Csmag *_csmag = &csmag;
+
+    if (IS_USE_TIMESTAMP_SYNCH) {
+        timestamp_comp_pix = AP_HAL::micros64();
+        if (is_first_csmag_message || ( (timestamp_comp_pix - csmag.timestamp_last_synch) > 
+            TIMESTAMP_SYNCH_INTERVAL) || 
+            (timestamp_comp_pix < csmag.timestamp_last_synch) ) {
+            // if first message OR timestamp_comp_delta changed more than the threshold or timestamp overflow:
+            // timestamp_comp_delta = _timestamp_comp_delta;   // synchronize again
+            is_first_csmag_message = false;
+            //
+            #if ISDOTESTTIMESYNCH
+                csmag.synch_timestamp((int) 42E6);  // TESTING HERE
+                //csmag.synch_timestamp(0xaffe000000000000);  // TESTING HERE
+            #else
+                csmag.synch_timestamp(AP_HAL::micros64());
+            #endif
+            csmag.timestamp_last_synch = timestamp_comp_pix;
+            // TODO: implement proper timestamp synch call here
+        }
+    }    
+
     if (CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE) {
 
         if (ISMONITORCHECKCSMAG) {
@@ -850,18 +872,20 @@ void Copter::check_send_csmag() {
             //     is_first_csmag_message = false;d
             // }
             // TODO: implement real timestamp synch
-            timestamp_comp_mag = _csmag->csmag_state->time_usec;                            // first timestamp of this future message from MAGClient
-            timestamp_comp_pix = AP_HAL::micros64();
-            _timestamp_comp_delta = timestamp_comp_pix - timestamp_comp_mag;
+            // BEGIN OLD timestamp synch
+            // timestamp_comp_mag = _csmag->csmag_state->time_usec;                            // first timestamp of this future message from MAGClient
+            // timestamp_comp_pix = AP_HAL::micros64();
+            // _timestamp_comp_delta = timestamp_comp_pix - timestamp_comp_mag;
 
-            if (is_first_csmag_message || ( (_timestamp_comp_delta - timestamp_comp_delta) >  CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE) ) {
-                // if first message OR timestamp_comp_delta changed more than the threshold:
-                timestamp_comp_delta = _timestamp_comp_delta;   // synchronize again
-                is_first_csmag_message = false;
-            }
+            // if (is_first_csmag_message || ( (_timestamp_comp_delta - timestamp_comp_delta) >  CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE) ) {
+            //     // if first message OR timestamp_comp_delta changed more than the threshold:
+            //     timestamp_comp_delta = _timestamp_comp_delta;   // synchronize again
+            //     is_first_csmag_message = false;
+            // }
+            // END OLD timestamp synch
 
             // use Pixhawk timestamp instead of MAGInterface timestamp
-            _csmag->csmag_state->time_usec += timestamp_comp_delta;
+            // _csmag->csmag_state->time_usec += timestamp_comp_delta;
 
             #if (CSMAG_IS_USE_BUFFER_MODE && IS_USE_CSMAGSTATEBUFFER)
                 csmag_state_buffer.push(_csmag->csmag_state);

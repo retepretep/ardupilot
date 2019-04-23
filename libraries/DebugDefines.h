@@ -42,6 +42,8 @@ Debug switches added by Peter
 
 #define ISPRINTOUTSENDCSMAG             0
 
+#define ISDOTESTTIMESYNCH               000
+
 
 
 #define SLOMOFACTOR                     10      // check integer division in ArduCopter.cpp SCHEDULER, SLOMOFACTOR 50 is also ok

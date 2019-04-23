@@ -1121,8 +1121,8 @@ bool Csmag::get_reading(uint64_t &induction_timestamp_i, int32_t &induction_valu
                 // TODO: invalid MAGInterface message! clear buffer and return false here?
                 // incorrect data
                 #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
-                    hal.console->printf("Error!!! Cannot interpret MAGInterface data. linebuf_len: %d\n", 
-                        (int) linebuf_len);
+                    hal.console->printf("Error!!! Cannot interpret MAGInterface data 0x%02x == '%c'. linebuf_len: %d\n", 
+                        c, c, (int) linebuf_len);
                 #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
                     hal.console->printf("?");
                 #endif
@@ -1151,8 +1151,8 @@ bool Csmag::get_reading(uint64_t &induction_timestamp_i, int32_t &induction_valu
             } else {
                 // incorrect data
                 #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
-                    hal.console->printf("Error!!! Cannot interpret MAGInterface data. linebuf_len: %d\n", 
-                        (int) linebuf_len);
+                    hal.console->printf("Error!!! Cannot interpret MAGInterface data 0x%02x == '%c'. linebuf_len: %d\n", 
+                        c, c, (int) linebuf_len);
                 #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
                     hal.console->printf("?");
                 #endif
@@ -1262,6 +1262,52 @@ bool Csmag::get_reading(uint64_t &induction_timestamp_i, int32_t &induction_valu
     // no readings so return false
     return is_successfully_read_data;
     // return nbytes;
+}
+
+
+//bool Csmag::synch_timestamp(uint64_t timestamp) {
+    
+void Csmag::synch_timestamp(uint64_t timestamp) {
+    // bool is_synch_successfully = true;
+    // // TODO: check if synch has been successfull
+
+    // build message in linebuf
+    char linebuf[MAG_INTERFACE_V30_MESSAGE_SIZE];
+    //timestamp_micros = micros();                            // get us timestamp
+    int i;
+    int checksum;
+    linebuf[ 0] = MAG_INTERFACE_V30_MAGIC_NUMBER1;          // byte 1 of magic number (not of linebuf)
+    linebuf[ 1] = MAG_INTERFACE_V30_MAGIC_NUMBER0;
+    
+    linebuf[ 2] = MAG_INTERFACE_V30_MODE_TIMESTAMP_SYNCH;
+    
+    linebuf[ 3] = GET_BYTE_FROM_NUMBER(timestamp, 7);       // higher uint32_t 0 if timestamp is uint32_t
+    linebuf[ 4] = GET_BYTE_FROM_NUMBER(timestamp, 6);
+    linebuf[ 5] = GET_BYTE_FROM_NUMBER(timestamp, 5);
+    linebuf[ 6] = GET_BYTE_FROM_NUMBER(timestamp, 4);
+    
+    linebuf[ 7] = GET_BYTE_FROM_NUMBER(timestamp, 3);
+    linebuf[ 8] = GET_BYTE_FROM_NUMBER(timestamp, 2);
+    linebuf[ 9] = GET_BYTE_FROM_NUMBER(timestamp, 1);
+    linebuf[10] = GET_BYTE_FROM_NUMBER(timestamp, 0);
+
+    linebuf[11] = 0;
+    linebuf[12] = 0;
+    linebuf[13] = 0;
+    linebuf[14] = 0;
+
+    for (i = 0, checksum = 0; i < MAG_INTERFACE_V30_MESSAGE_SIZE-1; i++) { // exclude checksum's slot itself
+        checksum += linebuf[i];
+    }
+    linebuf[15] = (uint8_t) (checksum & 0xFF);
+
+    // send message via serial port
+    //Serial.print(linebuf);      // problem: 0-terminated strings
+    for (i = 0; i < MAG_INTERFACE_V30_MESSAGE_SIZE; i++) {
+        uart->printf("%c", linebuf[i]);
+        // uart->printf(&(linebuf[i]));
+        //Serial.write(linebuf[i]);
+    }
 }
 
 
