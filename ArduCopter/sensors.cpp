@@ -719,10 +719,77 @@ void Copter::read_csmag(void) {
     // if necessary, send a customary message to gcs, to prove the new cusom arducopter code is running 
 #if ISDOREPEATEDGCSMESSAGE
     time_since_start = AP_HAL::micros64();      // update time
-    if (time_since_start - time_last_repeated_gcs_message > GCSMESSAGEINTERVAL)  {
+    bool is_send_repeated_message_now;
+    #if ISCOUNTMESSAGES
+    is_send_repeated_message_now = (time_since_start - time_last_repeated_gcs_message > GCSMESSAGEINTERVAL || !csmag.is_first_count_message_sent);
+    #else
+    is_send_repeated_message_now = time_since_start - time_last_repeated_gcs_message > GCSMESSAGEINTERVAL;
+    #endif
+
+    if (is_send_repeated_message_now)  {
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "Hey ho :) %6.4f", (double)3.1416f);
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Hals- und Beinbruch :)");
         time_last_repeated_gcs_message = time_since_start;
+
+        #if ISPRINTRINGBUFFEROVERFLOWCOUNTER
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "timestamp buffer overflows: %d", csmag.induction_value_timestamp_buffer->GetOverflowCounter());
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "ind val buffer overflows: %d", csmag.induction_value_buffer->GetOverflowCounter());
+        #endif
+
+        #if ISCOUNTMESSAGES
+        if (csmag.timestamp_first_outgoing_message > 0) {
+            csmag.is_first_count_message_sent = true;
+        }
+        hal.console->printf("count_outgoing_messages: \t%d\n", csmag.count_outgoing_messages);
+        hal.console->printf("count_outgoing_messages_copter: \t%d\n", csmag.count_outgoing_messages_copter);
+        #if ISSENDCOUNTERTOGCS
+            gcs().send_text(MAV_SEVERITY_CRITICAL, 
+                "count_outgoing_messages: \t%d\n", csmag.count_outgoing_messages);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, 
+                "count_outgoing_messages_copter: \t%d\n", csmag.count_outgoing_messages_copter);
+        #endif
+        hal.console->printf("timestamp_first_outgoing_message: %" PRIu64 "\n",
+            csmag.timestamp_first_outgoing_message);
+        hal.console->printf("timestamp_last_outgoing_message:  %" PRIu64 "\n",
+            csmag.timestamp_last_outgoing_message);
+        #if ISSENDCOUNTERTOGCS
+            gcs().send_text(MAV_SEVERITY_CRITICAL, 
+                "timestamp_first_outgoing_message: %" PRIu64 "\n", csmag.timestamp_first_outgoing_message);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, 
+                "timestamp_last_outgoing_message:  %" PRIu64 "\n", csmag.timestamp_last_outgoing_message);
+        #endif
+
+        
+        // for each induction value:
+        // int dT = 1000000 / CSMAG_INDUCTION_VALUE_SAMPLE_RATE;
+        // double ts_diff = (double) (csmag.timestamp_last_outgoing_message - csmag.timestamp_first_outgoing_message);
+        // double N_expected = ts_diff / dT;
+        // double q = csmag.count_outgoing_messages * CSMAG_INDUCTION_ARRAY_SIZE / N_expected;
+        // hal.console->printf("ts_diff: %e\n", ts_diff);
+        // hal.console->printf("N_expected: %lf\n", N_expected);
+        // hal.console->printf("q: %lf\n", q);
+
+        // for each CSMAG<N> message
+        int dT = 1000000 / CSMAG_INDUCTION_VALUE_SAMPLE_RATE * CSMAG_INDUCTION_ARRAY_SIZE;
+        double ts_diff = (double) csmag.timestamp_last_outgoing_message - 
+            (double) csmag.timestamp_first_outgoing_message;
+        double N_expected = ts_diff / dT + 1;   // to fix off by 1 error?
+        double q = csmag.count_outgoing_messages / N_expected;
+        double q_copter = csmag.count_outgoing_messages_copter / N_expected;
+        hal.console->printf("ts_diff: %e\n", ts_diff);
+        hal.console->printf("N_expected (according to timestamps): %lf\n", N_expected);
+        hal.console->printf("q: %lf\n", q);
+        hal.console->printf("q_copter: %lf\n", q_copter);
+
+        #if ISSENDCOUNTERTOGCS
+            gcs().send_text(MAV_SEVERITY_CRITICAL, 
+                "N_expected (according to timestamps): %lf\n", N_expected);
+            gcs().send_text(MAV_SEVERITY_CRITICAL, 
+                "q_copter: %lf\n", q_copter);
+        #endif
+
+        hal.console->printf("---------- ---------- ---------- ----------\n");
+        #endif
 
         if (ISDOMAGDATAINITREADUARTCHECK) {
             hal.console->printf("(M10) inited UART: %p\n", csmag.GetUART());
@@ -890,9 +957,17 @@ void Copter::check_send_csmag() {
             #if (CSMAG_IS_USE_BUFFER_MODE && IS_USE_CSMAGSTATEBUFFER)
                 csmag_state_buffer.push(_csmag->csmag_state);
             #endif
-            csmag = *_csmag; // set Csmag singleton to most recent csmag (redundant in buffer mode)
+            // uncommented this:
+            // csmag = *_csmag; // set Csmag singleton to most recent csmag (redundant in buffer mode)
 
             #if ISDOPRINTCSMAGMESSAGECONTENT
+                #if ISPRINTCSMAGMESSAGENUMBER
+                hal.console->printf("sending CSMAG%d, message no. %8d\n",
+                    CSMAG_MESSAGE_TYPE, csmag.count_outgoing_messages_copter);
+                #endif
+                #if ISPRINTCSMAGMESSAGECONTENTSHORT
+                hal.console->printf("sending CSMAG%d\n", CSMAG_MESSAGE_TYPE);
+                #else
                 hal.console->printf("sending CSMAG%d\n", CSMAG_MESSAGE_TYPE);
                 hal.console->printf("    timestamp: %" PRIu64 "\n", csmag.csmag_state->time_usec);
                 hal.console->printf("    induction: [");
@@ -901,6 +976,11 @@ void Copter::check_send_csmag() {
                     hal.console->printf("%+8" PRId32 ", ", csmag.csmag_state->induction[ii]);
                 }
                 hal.console->printf("    ]\n");
+                #endif
+            #endif
+
+            #if ISCOUNTMESSAGES
+                csmag.count_outgoing_messages_copter++;
             #endif
 
             // and send the message

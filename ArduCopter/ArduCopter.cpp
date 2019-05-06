@@ -105,7 +105,12 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     // SCHED_TASK(update_csmag,     (2*50/10),     10),           // 2x as fast to catch unsent messages // works
 #if (!ISUSESLOMOCSMAG)
     SCHED_TASK(read_csmag, (CSMAG_INDUCTION_VALUE_SAMPLE_RATE), 100),
-    SCHED_TASK(check_send_csmag, (CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE), 300),            // 
+    #if CSMAG_MESSAGE_TYPE <= (CSMAG_INDUCTION_VALUE_SAMPLE_RATE / 2)
+        SCHED_TASK(check_send_csmag, (CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE), 300),            // 
+    #else
+        // prevent rounding errors
+        SCHED_TASK(check_send_csmag, 1, 300),            // 
+    #endif
     // SCHED_TASK(check_send_csmag, (2 * CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE), 100),            //
 #else
     SCHED_TASK(read_csmag, (int) (CSMAG_INDUCTION_VALUE_SAMPLE_RATE / SLOMOFACTOR), 40),
@@ -233,8 +238,9 @@ void Copter::setup()
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Hey ho :) %6.4f", (double)3.1416f);
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "Last change: 20190328T1746+0100");
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "3. Last change: 20190401T1132+0200");
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "3. changed: 20190423T1620+0200");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "3. changed: 20190506T1054+0200");
         gcs().send_text(MAV_SEVERITY_CRITICAL, "using CSMAG message: CSMAG%d", CSMAG_MESSAGE_TYPE);
+        hal.console->printf("Timestamp now:%" PRIu64 "\n", AP_HAL::micros64());
 
         #if IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES
             gcs().send_text(MAV_SEVERITY_CRITICAL, "MAG data generated inside Pixhawk in Copter::read_csmag()");

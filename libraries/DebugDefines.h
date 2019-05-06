@@ -17,19 +17,21 @@ Debug switches added by Peter
 #define ISUSESLOMOCSMAG                 0       // execute read_csmag and check_send_csmag slower than usual (-> SCHEDULER) to make debug
                                                 // printouts more readable
 #define ISDOVERBOSEUARTCHECK            0       // send repeated message via UARTC (TELEM1 on Pixhawk1)
-#define ISDOMAGDATAINITREADUARTCHECK    00       // write out some status, if reading from UART worked at init
+#define ISDOMAGDATAINITREADUARTCHECK    0       // write out some status, if reading from UART worked at init
 #define ISDOMAGDATAREADUARTPOINTERCHECK 0       // print uart pointers for every read_csmag()
 #define ISDOMAGDATAREADUARTCHECK        00       // write out some status, if reading from UART worked
 #define ISPRINTTIMESTAMPREADCSMAG       00      // print a timestamp every time Copter::read_csmag() is called
-#define ISDOINTERVALMAGDATAREADUARTCHECK    000   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
-#define ISDOCSMAGUPDATEDEBUG            000      // debug printouts for Csmag::update()
+#define ISDOINTERVALMAGDATAREADUARTCHECK    00   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
+#define ISDOCSMAGUPDATEDEBUG            00      // debug printouts for Csmag::update()
 
-#define ISDOPRINTCSMAGMESSAGECONTENT    001       // print the content of CSMAG<N> every time, it's sent
-#define ISDOPRINTREADCSMAGR             00
+#define ISDOPRINTCSMAGMESSAGECONTENT    000       // print the content of CSMAG<N> every time, it's sent
+#define ISPRINTCSMAGMESSAGECONTENTSHORT 0
+#define ISPRINTCSMAGMESSAGENUMBER       000
+#define ISDOPRINTREADCSMAGR             0
 
-#define ISDOPRINTCALLCSMAGUPDATE        00
+#define ISDOPRINTCALLCSMAGUPDATE        0
 
-#define ISDOINDUCTIONVALUEBUFFERSIZEPRINTOUT    1   // every Copter::check_send_message() print out size of i v buffer
+#define ISDOINDUCTIONVALUEBUFFERSIZEPRINTOUT    0000   // every Copter::check_send_message() print out size of i v buffer
 
 #define ISDOVERBOSEDEBUGPRINTOUTS       0
 #define ISDOFORMERTEMPVERBOSEDEBUG      0
@@ -37,12 +39,19 @@ Debug switches added by Peter
 #define ISDOMSG_SEND_CSMAGN_PRINTOUT    0
 
 #define ISDOUARTDEBUG                   0
-#define ISPRINTOUTNOUARTCONNECTIONVERBOSE       1   // print out full message
-#define ISPRINTOUTNOUARTCONNECTIONSIMPLE        0   // just print out "X"
+#define ISPRINTOUTNOUARTCONNECTIONVERBOSE       000   // print out full message
+#define ISPRINTOUTNOUARTCONNECTIONSIMPLE        001   // just print out "X"
 
 #define ISPRINTOUTSENDCSMAG             0
 
-#define ISDOTESTTIMESYNCH               000
+#define ISDOTESTTIMESYNCH               0
+#define ISPRINTRINGBUFFEROVERFLOWCOUNTER        0000
+
+// for debugging missing MAVLink messages
+#define ISCOUNTMESSAGES                 0000
+#define ISTRACKMAXTIMEBETWEENMESSAGES   0           // not implemented yet
+#define ISRESETCOUNTMESSAGESAFTERINIT   0000           // to prevent miscalculations due to initially unsynched timestamps
+#define ISSENDCOUNTERTOGCS              0000           // otherwise print on console
 
 
 

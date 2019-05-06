@@ -448,6 +448,25 @@ void GCS_MAVLINK::send_csmag(void) {
         }
     #endif
 
+    #if ISCOUNTMESSAGES
+
+        #if ISRESETCOUNTMESSAGESAFTERINIT
+        if (!csmag->is_did_counter_reset && csmag->count_outgoing_messages_copter >= NUMBEROFMESSAGESTHATTRIGGERRESET) {
+            // reset after ca 20 seconds
+            csmag->timestamp_first_outgoing_message = st->time_usec;
+            csmag->count_outgoing_messages = 0;
+            csmag->count_outgoing_messages_copter = 1;
+            csmag->is_did_counter_reset = true;
+        }
+        #endif
+
+    if (csmag->timestamp_first_outgoing_message == 0) {
+        csmag->timestamp_first_outgoing_message = st->time_usec;
+    }
+    csmag->count_outgoing_messages++;
+    csmag->timestamp_last_outgoing_message = st->time_usec;
+    #endif // CONTINUE HERE
+
     #if (CSMAG_MESSAGE_TYPE == 0)
         if (ISDOMSG_SEND_CSMAGN_PRINTOUT) { hal.console->printf("calling mavlink_msg_csmag0_send();\n"); }
         mavlink_msg_csmag0_send(chan,

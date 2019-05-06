@@ -225,6 +225,23 @@ public:
 
     AP_HAL::UARTDriver *GetUART(void) { return uart; }
 
+    // for debugging missing MAVLink messages
+
+    #if ISCOUNTMESSAGES
+    int count_outgoing_messages = 0;
+    int count_outgoing_messages_copter = 0;
+    uint64_t timestamp_first_outgoing_message = 0;
+    uint64_t timestamp_last_outgoing_message = 0;
+    bool is_first_count_message_sent = false;
+    bool is_did_counter_reset = false;
+    #endif
+    #if ISTRACKMAXTIMEBETWEENMESSAGES
+    uint64_t timestamp_last_message = 0;
+    uint64_t timestamp_this_message = 0;
+    int64_t timestamp_difference_max = -1;
+    uint64_t timestamp_of_timestamp_difference_max = 0;
+    #endif
+
 private:
     static Csmag *_singleton;
     
@@ -382,6 +399,7 @@ public:
 
     void print_bits(uint32_t n);
     void print_info(void);             // for debug purposes
+    int GetOverflowCounter(void) {return overflow_counter;}
     
 
 private:
@@ -401,6 +419,8 @@ private:
     int object_counter;
     // const int buffer_size;
     int buffer_size;
+
+    int overflow_counter = 0;
 
     //static RingBuffer<T> *_singleton;
 };
@@ -449,6 +469,7 @@ bool RingBuffer<T>::enqueue(T new_obj) {
         // TODO: overwrite first object
         printf("WARNING! RingBuffer<T> buffer overflow, old objects get overwritten, ");
         printf("buffer_size: %d\n", this->buffer_size);
+        overflow_counter++;
         //throw "CsmagStateBuffer buffer overflow";   // throw disabled
         //return false;
     }

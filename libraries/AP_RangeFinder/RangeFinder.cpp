@@ -1121,7 +1121,7 @@ bool Csmag::get_reading(uint64_t &induction_timestamp_i, int32_t &induction_valu
                 // TODO: invalid MAGInterface message! clear buffer and return false here?
                 // incorrect data
                 #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
-                    hal.console->printf("Error!!! Cannot interpret MAGInterface data 0x%02x == '%c'. linebuf_len: %d\n", 
+                    hal.console->printf("Error!!! Can't interpret MAGInterface data 0x%02x == '%c'. linebuf_len: %d\n", 
                         c, c, (int) linebuf_len);
                 #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
                     hal.console->printf("?");
@@ -1151,7 +1151,7 @@ bool Csmag::get_reading(uint64_t &induction_timestamp_i, int32_t &induction_valu
             } else {
                 // incorrect data
                 #if ISPRINTOUTNOUARTCONNECTIONVERBOSE
-                    hal.console->printf("Error!!! Cannot interpret MAGInterface data 0x%02x == '%c'. linebuf_len: %d\n", 
+                    hal.console->printf("Error!!! Can't interpret MAGInterface data 0x%02x == '%c'. linebuf_len: %d\n", 
                         c, c, (int) linebuf_len);
                 #elif ISPRINTOUTNOUARTCONNECTIONSIMPLE
                     hal.console->printf("?");

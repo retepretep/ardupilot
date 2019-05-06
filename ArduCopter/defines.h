@@ -508,10 +508,11 @@ enum LoggingParameters {
 #define IS_PRINT_MISC_CHAR_UART_BUFFER          1
 
 #define CSMAG_MESSAGE_TYPE                      10                               // 0 for CSMAG0, 62 for CSMAG61, etc.
+// #define CSMAG_MESSAGE_TYPE                      1                               // 0 for CSMAG0, 62 for CSMAG61, etc.
 
 // UART_FOR_CSMAG_DATA works on TELEM1 on Pixhawk1 and CubeBlack
-#define UART_FOR_CSMAG_DATA                     (hal.uartC)                   
-// #define UART_FOR_CSMAG_DATA                     (hal.uartF)                     // UART F: CONS on CubeBlack
+//#define UART_FOR_CSMAG_DATA                     (hal.uart)                    // UART C: on Pixhawk
+#define UART_FOR_CSMAG_DATA                     (hal.uartF)                     // UART F: CONS on CubeBlack
 #define CSMAG_TIMESTAMP_SYNCHRONIZATION_TRIGGER_DIFFERENCE  (1E6)               // if difference of timestamp_comp_deltas is higher than this: new synch
 #define INDUCTION_VALUE_TIMEOUT_BUFFER_FLUSH_THRESHOLD      (1E6)               // after which time (us) timeout buffer flush gets triggered?
 #define MISC_CHAR_UART_BUFFER_SIZE                          128
@@ -563,9 +564,9 @@ static_assert(!(IS_GENERATE_FAKE_CSMAG_STATE && IS_GENERATE_FAKE_CSMAG_INDUCTION
 #define CSMAG61_INDUCTION_ARRAY_SIZE            61
 
 #if CSMAG_MESSAGE_TYPE < 10
-    #define #define CSMAG_INDUCTION_VALUE_BUFFER_SIZE   (10 * 10)               // 100 values: 2 seconds, will be erased anyways
+    #define CSMAG_INDUCTION_VALUE_BUFFER_SIZE   (10 * 10)               // 100 values: 2 seconds, will be erased anyways
 #else
-    #define CSMAG_INDUCTION_VALUE_BUFFER_SIZE           (100 * CSMAG_MESSAGE_TYPE)            // 10 is just in case
+    #define CSMAG_INDUCTION_VALUE_BUFFER_SIZE           (10 * CSMAG_MESSAGE_TYPE)            // 10 is just in case
 #endif
 
 // #define CSMAG_INDUCTION_VALUE_BUFFER_SIZE       (62 * CSMAG_BUFFER_SIZE)        // max 62 induction values per message works
@@ -583,4 +584,12 @@ static_assert(!(IS_GENERATE_FAKE_CSMAG_STATE && IS_GENERATE_FAKE_CSMAG_INDUCTION
 #endif
 #define CSMAG_INVALID_INDUCTION_VALUE           (0x7fffffff)                    // pointing out that it is not a real magnetic induction value
 #define CSMAG_INDUCTION_VALUE_SAMPLE_RATE       50                              // induction values per second, measured & emitted by MAGInterface
+
+// for DebugDefines.h
+#if (CSMAG_INDUCTION_ARRAY_SIZE < CSMAG_INDUCTION_VALUE_SAMPLE_RATE)
+    #define NUMBEROFMESSAGESTHATTRIGGERRESET    (20 * CSMAG_INDUCTION_VALUE_SAMPLE_RATE / CSMAG_INDUCTION_ARRAY_SIZE)
+#else
+    #define NUMBEROFMESSAGESTHATTRIGGERRESET    (20)    // to prevent integer division errors
+#endif
+
 // }
