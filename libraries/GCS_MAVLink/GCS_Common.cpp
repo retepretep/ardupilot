@@ -28,7 +28,11 @@
 // added by peter {
 //#include <AP_Csmag/AP_Csmag.h>
 //#include "../ArduCopter/Copter.h"                  // TEMPORARY workaround, TODO: fix this, using porper AP_Csmag
-#include <AP_RangeFinder/RangeFinder.h>         // temporary workaround for Csmag class
+#if IS_USE_CSMAG_RANGEFINDER_WORKAROUND
+    #include <AP_RangeFinder/RangeFinder.h>         // temporary workaround for Csmag class
+#else
+    #include <AP_Csmag/AP_Csmag.h>
+#endif
 
 #if ISPRINTMESSAGESINTOFILE
     #include <stdlib.h>                             //

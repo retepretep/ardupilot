@@ -932,6 +932,8 @@ MAV_DISTANCE_SENSOR RangeFinder::get_mav_distance_sensor_type_orient(enum Rotati
 
 RangeFinder *RangeFinder::_singleton;
 
+#if IS_USE_CSMAG_RANGEFINDER_WORKAROUND
+
 // added by peter
 // TODO: put into Csmag.cpp and make sure csmag files are added to compile path
 
@@ -1718,3 +1720,5 @@ void RingBufferUInt64::print_info() {
 RingBufferUInt64 *RingBufferUInt64::_singleton;
 
 #endif 
+
+#endif

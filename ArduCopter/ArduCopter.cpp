@@ -238,7 +238,7 @@ void Copter::setup()
         gcs().send_text(MAV_SEVERITY_CRITICAL, "Hey ho :) %6.4f", (double)3.1416f);
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "Last change: 20190328T1746+0100");
         //gcs().send_text(MAV_SEVERITY_CRITICAL, "3. Last change: 20190401T1132+0200");
-        gcs().send_text(MAV_SEVERITY_CRITICAL, "3. changed: 20190506T1054+0200");
+        gcs().send_text(MAV_SEVERITY_CRITICAL, "3. changed: 20190506T1559+0200");
         gcs().send_text(MAV_SEVERITY_CRITICAL, "using CSMAG message: CSMAG%d", CSMAG_MESSAGE_TYPE);
         hal.console->printf("Timestamp now:%" PRIu64 "\n", AP_HAL::micros64());
 

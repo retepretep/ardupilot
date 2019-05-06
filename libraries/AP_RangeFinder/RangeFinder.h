@@ -187,7 +187,9 @@ private:
 // added by peter
 // tried to use separate AP_Csmag/Csmag.h, but couldn't add this to compile process
 // TEMPORARY workaround, TODO: fix this
-#include <../ArduCopter/defines.h>  // for array size
+#include <../ArduCopter/defines.h>  // for array size and meta defines
+
+#if IS_USE_CSMAG_RANGEFINDER_WORKAROUND
 
 // need to add backend (drivers) for CSMAG
 
@@ -668,3 +670,5 @@ private:
 };
 
 #endif 
+
+#endif

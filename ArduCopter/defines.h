@@ -498,7 +498,7 @@ enum LoggingParameters {
 #define CSMAG_IS_USE_INDUCTION_VALUE_BUFFER_MODE    1                           // buffer induction values read from serial interface
 #define IS_USE_IS_FREE_MASK_FOR_RINGBUFFER      0                               // sitl can handle __uint128_t, but Pixhawk can't
 #define IS_GENERATE_FAKE_CSMAG_STATE            0                               // generate fake csmag data for each Csmag::CsmagState (N induction values & timestamp)
-#define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES 000                             // generate fake csmag data for each induction value
+#define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES 001                             // generate fake csmag data for each induction value
 #define IS_GENERATE_FAKE_CSMAG_INDUCTION_VALUES_SIN 1                           // use some sine function as fake induction values
 #define IS_COMPILE_FOR_SITL                     0                               // 0 for real boards, the boards can't handle some commands
 #define MAGNETOMETER_SERIAL_BAUDRATE            115200                          // TODO: read this from some config
@@ -522,6 +522,8 @@ enum LoggingParameters {
 
 #define IS_USE_TIMESTAMP_SYNCH                  001
 #define TIMESTAMP_SYNCH_INTERVAL                (10*1E6)                        // timestamp synch every # us
+
+#define IS_USE_CSMAG_RANGEFINDER_WORKAROUND     001
 
 // end of parameters
 // normally no need to change values from here 

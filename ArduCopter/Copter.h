@@ -140,8 +140,12 @@
 // added by peter {
 
 #if CSMAG_ENABLED == ENABLED
- //# include <AP_Csmag/AP_Csmag.h>              // for future implementation 
- # include <AP_RangeFinder/RangeFinder.h>         // workaround by peter, couldn't compile separate csmag class in csmag.h yet
+// changed Csmag-API HERE
+    #if IS_USE_CSMAG_RANGEFINDER_WORKAROUND
+     # include <AP_RangeFinder/RangeFinder.h>         // workaround by peter, couldn't compile separate csmag class in csmag.h yet
+    #else
+     # include <AP_Csmag/AP_Csmag.h>              // for future implementation 
+    #endif
 #endif
 
 // }

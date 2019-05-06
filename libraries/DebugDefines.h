@@ -24,7 +24,7 @@ Debug switches added by Peter
 #define ISDOINTERVALMAGDATAREADUARTCHECK    00   // same as ISDOMAGDATAREADUARTCHECK, but together with ISDOREPEATEDGCSMESSAGE
 #define ISDOCSMAGUPDATEDEBUG            00      // debug printouts for Csmag::update()
 
-#define ISDOPRINTCSMAGMESSAGECONTENT    000       // print the content of CSMAG<N> every time, it's sent
+#define ISDOPRINTCSMAGMESSAGECONTENT    0001       // print the content of CSMAG<N> every time, it's sent
 #define ISPRINTCSMAGMESSAGECONTENTSHORT 0
 #define ISPRINTCSMAGMESSAGENUMBER       000
 #define ISDOPRINTREADCSMAGR             0
